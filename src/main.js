@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { createLanterns } from './objects/lanterns.js';
+import { loadTree } from './objects/tree.js';
+import { createStars } from './objects/stars.js';
 
-// --- Scene ---
+// Scene, Camera, Renderer
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0c2a);
 
-// Camera
 const camera = new THREE.PerspectiveCamera(
   60,
   window.innerWidth / window.innerHeight,
@@ -14,20 +16,14 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.set(0, 12, 35);
 
-// Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Controls
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 5, 0);
 
-// Lights
 scene.add(new THREE.AmbientLight(0x111122, 0.25));
-const mountainLight = new THREE.PointLight(0xffaa55, 1.2, 20, 2);
-mountainLight.position.set(0, 7, 0);
-scene.add(mountainLight);
 
 // Floor
 const floor = new THREE.Mesh(
@@ -42,100 +38,23 @@ floor.rotation.x = -Math.PI / 2;
 floor.position.y = -5;
 scene.add(floor);
 
-// Mountain
-const mountain = new THREE.Mesh(
-  new THREE.ConeGeometry(8, 8, 32),
-  new THREE.MeshStandardMaterial({
-    color: 0x0d0d0d,
-    roughness: 1,
-    metalness: 0,
-  })
-);
-mountain.position.set(0, -1, 0);
-scene.add(mountain);
+// Objects
+let lanterns = [];
+let treeModel;
 
-// Stars
-const starsGeometry = new THREE.BufferGeometry();
-const starVertices = [];
-for (let i = 0; i < 500; i++) {
-  starVertices.push(
-    (Math.random() - 0.5) * 400,
-    Math.random() * 200 + 10,
-    (Math.random() - 0.5) * 400
-  );
-}
-starsGeometry.setAttribute(
-  'position',
-  new THREE.Float32BufferAttribute(starVertices, 3)
-);
-scene.add(
-  new THREE.Points(
-    starsGeometry,
-    new THREE.PointsMaterial({ color: 0xffffff, size: 0.3 })
-  )
-);
+(async () => {
+  lanterns = await createLanterns(scene, 50); // now async
+  console.log('Lanterns loaded');
 
-// --- Lanterns ---
-const lanterns = [];
+  treeModel = await loadTree(scene);
+  console.log('Blender Sakura tree loaded');
+})();
+
+const stars = createStars(scene);
+
+// Popup
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-
-for (let i = 0; i < 50; i++) {
-  const geometry = new THREE.CylinderGeometry(0.5, 0.6, 2, 16);
-  const color = new THREE.Color(0xffa500).offsetHSL(
-    0,
-    0,
-    (Math.random() - 0.5) * 0.1
-  );
-
-  const shaderMaterial = new THREE.ShaderMaterial({
-    uniforms: { glowColor: { value: color }, intensity: { value: 1.0 } },
-    vertexShader: `
-      varying vec3 vNormal;
-      void main(){ vNormal=normalize(normalMatrix*normal);
-        gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
-    fragmentShader: `
-      uniform vec3 glowColor;
-      uniform float intensity;
-      varying vec3 vNormal;
-      void main(){
-        float glow = pow(1.0-dot(vNormal,vec3(0,1,0)), 2.0)*intensity;
-        gl_FragColor = vec4(glowColor*glow,0.7);}`,
-    transparent: true,
-    side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
-  });
-
-  const lantern = new THREE.Mesh(geometry, shaderMaterial);
-  lantern.position.set(
-    (Math.random() - 0.5) * 40,
-    Math.random() * 4 + 4,
-    (Math.random() - 0.5) * 40
-  );
-
-  const light = new THREE.PointLight(color, 0.8, 6, 2);
-  light.position.set(0, 0.5, 0);
-  lantern.add(light);
-
-  // Unique ID + default popup info
-  lantern.userData = {
-    id: i + 1,
-    image: 'https://placehold.co/200x150?text=Lantern+' + (i + 1),
-    text: 'Gacor main di MAXWIN' + (i + 1),
-  };
-
-  scene.add(lantern);
-  lanterns.push({
-    mesh: lantern,
-    speed: 0.01 + Math.random() * 0.02,
-    light: light,
-    shaderMaterial: shaderMaterial,
-    flickerOffset: Math.random() * Math.PI * 2,
-    rotationSpeed: (Math.random() - 0.5) * 0.002,
-  });
-}
-
-// --- Popup ---
 const popup = document.getElementById('popup');
 const popupImage = document.getElementById('popupImage');
 const popupText = document.getElementById('popupText');
@@ -146,7 +65,6 @@ document.getElementById('popupClose').addEventListener('click', () => {
 window.addEventListener('click', (event) => {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(lanterns.map((l) => l.mesh));
   if (intersects.length > 0) {
@@ -157,7 +75,7 @@ window.addEventListener('click', (event) => {
   }
 });
 
-// --- Animate ---
+// Animate
 function animate() {
   requestAnimationFrame(animate);
   const time = Date.now() * 0.002;
@@ -176,10 +94,10 @@ function animate() {
       l.mesh.position.z = (Math.random() - 0.5) * 40;
     }
 
+    // 🔹 Flicker light only (no shaderMaterial anymore)
     const intensity =
       0.5 + Math.sin(time + l.flickerOffset) * 0.2 + Math.random() * 0.05;
     l.light.intensity = intensity;
-    l.shaderMaterial.uniforms.intensity.value = intensity;
   });
 
   camera.position.y = 12 + Math.sin(time * 0.1) * 0.5;
