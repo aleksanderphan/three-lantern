@@ -1,11 +1,5 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import {
-  MeshStandardMaterial,
-  Color,
-  PointLight,
-  AmbientLight,
-  DirectionalLight,
-} from 'three';
+import { Color, PointLight, AmbientLight, DirectionalLight } from 'three';
 
 export function loadTree(scene, path = '/models/cherry_tree.glb') {
   return new Promise((resolve, reject) => {
