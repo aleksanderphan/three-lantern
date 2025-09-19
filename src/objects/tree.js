@@ -1,16 +1,19 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { Color, PointLight, AmbientLight, DirectionalLight } from 'three';
+import {
+  MeshStandardMaterial,
+  Color,
+  PointLight,
+  AmbientLight,
+  HemisphereLight,
+  TextureLoader,
+  BackSide,
+  SphereGeometry,
+  Mesh,
+} from 'three';
 
 export function loadTree(scene, path = '/models/cherry_tree.glb') {
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader();
-
-    // 🌌 Set night sky background
-    scene.background = new Color(0x000010); // deep navy
-
-    // 🌙 Add dim ambient light (soft global glow)
-    const ambient = new AmbientLight(0x222244, 0.5); // bluish dim light
-    scene.add(ambient);
 
     loader.load(
       path,
@@ -21,15 +24,30 @@ export function loadTree(scene, path = '/models/cherry_tree.glb') {
         tree.scale.set(5, 5, 5);
         tree.position.set(0, -5, 0);
 
-        // 🌙 "Moonlight" directional light
-        const moonLight = new DirectionalLight(0xaaaaff, 1.0);
-        moonLight.position.set(-10, 20, 10);
-        scene.add(moonLight);
+        // 🌌 Night sky background (large sphere around the scene)
+        const textureLoader = new TextureLoader();
+        textureLoader.load('/textures/stars.jpg', (starsTexture) => {
+          const skyGeo = new SphereGeometry(200, 64, 64);
+          const skyMat = new MeshStandardMaterial({
+            map: starsTexture,
+            side: BackSide,
+          });
+          const sky = new Mesh(skyGeo, skyMat);
+          scene.add(sky);
+        });
 
-        // ✨ Soft point light to highlight tree (like a lantern)
-        const pointLight = new PointLight(0xffffff, 2, 50);
-        pointLight.position.set(0, 10, 0);
-        scene.add(pointLight);
+        // 🌙 Moonlight (bluish ambient)
+        const ambient = new AmbientLight(0x334466, 0.4);
+        scene.add(ambient);
+
+        // 🌌 Subtle hemisphere light (sky = blue, ground = dark)
+        const hemiLight = new HemisphereLight(0x223366, 0x000000, 0.3);
+        scene.add(hemiLight);
+
+        // 🔦 Point light near tree (like lantern/moon glow)
+        const light = new PointLight(0xffffff, 100, 50);
+        light.position.set(0, 10, 10);
+        scene.add(light);
 
         scene.add(tree);
         resolve(tree);
