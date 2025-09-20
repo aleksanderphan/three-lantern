@@ -241,3 +241,13 @@ function animate() {
 }
 
 animate();
+
+// Register the service worker once at startup
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then(
+      (reg) => console.log('Service worker registered:', reg),
+      (err) => console.error('Service worker registration failed:', err)
+    );
+  });
+}
