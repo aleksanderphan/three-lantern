@@ -9,9 +9,9 @@ import { createLanterns } from './objects/lanterns.js';
 import { loadTree } from './objects/tree.js';
 import { createStars } from './objects/stars.js';
 
-// 🌌 Scene, Camera, Renderer
+// Scene, Camera, Renderer
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0b0c2a);
+scene.background = new THREE.Color(0x0d203d);
 scene.fog = new THREE.FogExp2(0x0b0c2a, 0.015);
 
 const camera = new THREE.PerspectiveCamera(
@@ -32,10 +32,11 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 5, 0);
 controls.enablePan = false;
 controls.enableZoom = true;
+// Limit zoom distance
 controls.minDistance = 20;
 controls.maxDistance = 40;
 
-// 🌙 Lights
+// Lights
 scene.add(new THREE.AmbientLight(0x111122, 0.25));
 const moonLight = new THREE.DirectionalLight(0x99bbff, 1.2);
 moonLight.position.set(-30, 50, -20);
@@ -44,9 +45,9 @@ moonLight.shadow.mapSize.set(2048, 2048);
 moonLight.shadow.bias = -0.0001;
 scene.add(moonLight);
 
-// 🌍 Floor
+// Floor
 const floor = new THREE.Mesh(
-  new THREE.CircleGeometry(20, 64),
+  new THREE.CircleGeometry(64, 64),
   new THREE.MeshStandardMaterial({
     color: 0x221a0f,
     roughness: 1,
@@ -59,7 +60,7 @@ floor.position.y = -5;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// 🌟 Objects
+// Objects
 let lanterns = [];
 let treeModel;
 
@@ -71,12 +72,10 @@ let treeModel;
   console.log('Blender Sakura tree loaded');
 })();
 
-// 🌠 Stars
+// Stars
 const stars = createStars(scene);
 
-// ======================
 // Bloom & Shader Effects
-// ======================
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 
@@ -155,16 +154,19 @@ function resetCamera() {
 
   requestAnimationFrame(animateReset);
 }
-const pointLight = new THREE.PointLight(0xff929f, 800, 10000);
-// 2 = intensity, 10 = distance (how far it reaches)
+const pointLight = new THREE.PointLight(
+  0xff929f, // Color
+  800, // Intensity
+  10000 // Distance (How far it reaches)
+);
 scene.add(pointLight);
 
 // Popup close button
 document.getElementById('popupClose').addEventListener('click', (event) => {
-  event.stopPropagation(); // 🔒 prevent click-through to lanterns
+  event.stopPropagation(); // prevent click-through to lanterns
   popup.style.display = 'none';
 
-  resetCamera(); // 🔄 reset after closing popup
+  resetCamera(); // reset camera after closing popup
 });
 
 window.addEventListener('click', (event) => {
@@ -211,9 +213,7 @@ window.addEventListener('click', (event) => {
   }
 });
 
-// ======================
 // Animate
-// ======================
 function animate() {
   requestAnimationFrame(animate);
   const time = Date.now() * 0.002;
@@ -231,7 +231,7 @@ function animate() {
     l.light.intensity = intensity;
   });
 
-  stars.material.uniforms.time.value = time;
+  // stars.material.uniforms.time.value = time;
   colorPass.uniforms.time.value = time * 0.5;
 
   camera.position.y = 12 + Math.sin(time * 0.1) * 0.5;
