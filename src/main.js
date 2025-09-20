@@ -195,8 +195,8 @@ window.addEventListener('click', (event) => {
       onComplete: () => {
         // After zoom, show popup
         const clicked = clickedLantern.userData;
-        popupImage.src = clicked.image;
-        popupText.textContent = clicked.text;
+        popupImage.src = `https://placehold.co/200x150.png?text=Lantern`;
+        popupText.textContent = `Lantern :)`;
         popup.style.display = 'block';
       },
     });

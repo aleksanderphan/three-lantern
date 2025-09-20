@@ -42,7 +42,7 @@ export function createLanterns(
           // Extra data
           lantern.userData = {
             id: i + 1,
-            image: `https://placehold.co/200x150.png?text=Lantern`,
+            image: `https://placehold.co/200x150.png?text=Lantern+${i + 1}`,
             text: `lantern ${i + 1}`,
           };
 
