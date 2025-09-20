@@ -1,12 +1,15 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
-
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { createLanterns } from './objects/lanterns.js';
 import { loadTree } from './objects/tree.js';
 import { createStars } from './objects/stars.js';
 
-// Scene, Camera, Renderer
+// 🌌 Scene, Camera, Renderer
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0c2a);
 scene.fog = new THREE.FogExp2(0x0b0c2a, 0.015);
@@ -32,21 +35,18 @@ controls.enableZoom = true;
 controls.minDistance = 20;
 controls.maxDistance = 40;
 
-// 🌌 Ambient night light
+// 🌙 Lights
 scene.add(new THREE.AmbientLight(0x111122, 0.25));
-
-// 🌙 Moonlight
 const moonLight = new THREE.DirectionalLight(0x99bbff, 1.2);
 moonLight.position.set(-30, 50, -20);
 moonLight.castShadow = true;
-moonLight.shadow.mapSize.width = 2048;
-moonLight.shadow.mapSize.height = 2048;
+moonLight.shadow.mapSize.set(2048, 2048);
 moonLight.shadow.bias = -0.0001;
 scene.add(moonLight);
 
-// Floor (shrink & circular)
+// 🌍 Floor
 const floor = new THREE.Mesh(
-  new THREE.CircleGeometry(20, 64), // smaller circle, radius 20
+  new THREE.CircleGeometry(20, 64),
   new THREE.MeshStandardMaterial({
     color: 0x221a0f,
     roughness: 1,
@@ -59,7 +59,7 @@ floor.position.y = -5;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// Objects
+// 🌟 Objects
 let lanterns = [];
 let treeModel;
 
@@ -71,8 +71,55 @@ let treeModel;
   console.log('Blender Sakura tree loaded');
 })();
 
-// 🌟 Stars
+// 🌠 Stars
 const stars = createStars(scene);
+
+// ======================
+// Bloom & Shader Effects
+// ======================
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+
+// UnrealBloomPass (glow effect)
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  0.5, // strength
+  1.8, // radius
+  0.85 // threshold
+);
+composer.addPass(bloomPass);
+
+// Simple color shift shader (optional "dreamy" look)
+const colorShiftShader = {
+  uniforms: { tDiffuse: { value: null }, time: { value: 0 } },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+    }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float time;
+    varying vec2 vUv;
+    void main() {
+      vec2 uv = vUv;
+      vec3 col = texture2D(tDiffuse, uv).rgb;
+      col.r += 0.02 * sin(time + uv.y * 10.0);
+      col.b += 0.02 * cos(time + uv.x * 10.0);
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+};
+const colorPass = new ShaderPass(colorShiftShader);
+composer.addPass(colorPass);
+
+// Resize handling
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+});
 
 // Popup
 const raycaster = new THREE.Raycaster();
@@ -108,6 +155,9 @@ function resetCamera() {
 
   requestAnimationFrame(animateReset);
 }
+const pointLight = new THREE.PointLight(0xff929f, 800, 10000);
+// 2 = intensity, 10 = distance (how far it reaches)
+scene.add(pointLight);
 
 // Popup close button
 document.getElementById('popupClose').addEventListener('click', (event) => {
@@ -132,6 +182,9 @@ window.addEventListener('click', (event) => {
 
     const offset = new THREE.Vector3(0, 2, 5); // camera offset from lantern
     const destination = targetPos.clone().add(offset);
+
+    controls.minDistance = 0;
+    controls.maxDistance = 40;
 
     gsap.to(camera.position, {
       duration: 1.5,
@@ -158,38 +211,33 @@ window.addEventListener('click', (event) => {
   }
 });
 
+// ======================
 // Animate
+// ======================
 function animate() {
   requestAnimationFrame(animate);
   const time = Date.now() * 0.002;
 
-  // Lanterns floating + flicker
   lanterns.forEach((l) => {
     l.mesh.position.y += l.speed;
-    l.mesh.position.x +=
-      Math.sin(Date.now() * 0.001 + l.mesh.position.y) * 0.002;
-    l.mesh.position.z +=
-      Math.cos(Date.now() * 0.001 + l.mesh.position.y) * 0.002;
     l.mesh.rotation.y += l.rotationSpeed;
-
     if (l.mesh.position.y > 20) {
       l.mesh.position.y = Math.random() * 2 + 4;
       l.mesh.position.x = (Math.random() - 0.5) * 40;
       l.mesh.position.z = (Math.random() - 0.5) * 40;
     }
-
-    // Flicker effect
     const intensity =
-      0.6 + Math.sin(time + l.flickerOffset) * 0.2 + Math.random() * 0.05;
+      0.6 + Math.sin(time + l.flickerOffset) * 0.2 + Math.random() * 0.5;
     l.light.intensity = intensity;
   });
 
-  // Stars twinkling
   stars.material.uniforms.time.value = time;
+  colorPass.uniforms.time.value = time * 0.5;
 
   camera.position.y = 12 + Math.sin(time * 0.1) * 0.5;
   controls.update();
-  renderer.render(scene, camera);
+
+  composer.render();
 }
 
 animate();
