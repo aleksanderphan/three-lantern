@@ -7,7 +7,7 @@ export function createStars(scene) {
 
   for (let i = 0; i < starCount; i++) {
     positions[i * 3] = (Math.random() - 0.5) * 800; // wider spread
-    positions[i * 3 + 1] = Math.random() * 400 + 20; // up in the "sky"
+    positions[i * 3 + 1] = Math.random() * 400 - 10; // up in the "sky"
     positions[i * 3 + 2] = (Math.random() - 0.5) * 800;
   }
 
