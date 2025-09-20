@@ -51,7 +51,7 @@ export function createLanterns(
 
           lanterns.push({
             mesh: lantern,
-            speed: 0.01 + Math.random() * 0.05,
+            speed: 0.01 + Math.random() * 0.02,
             light: light,
             flickerOffset: Math.random() * Math.PI * 2,
             rotationSpeed: (Math.random() - 0.5) * 0.002,
