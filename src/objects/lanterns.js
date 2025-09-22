@@ -22,7 +22,7 @@ export function createLanterns(
           // Random position
           lantern.position.set(
             (Math.random() - 0.5) * 40,
-            Math.random() * 4 + 4,
+            Math.random() * 35,
             (Math.random() - 0.5) * 40
           );
           lantern.scale.set(0.5, 0.5, 0.5); // adjust size
@@ -40,7 +40,7 @@ export function createLanterns(
           lantern.add(light);
 
           // Extra data
-          lantern.userData = {
+          lantern.userData.custom = {
             id: i + 1,
             image: `https://placehold.co/200x150.png?text=Lantern+${i + 1}`,
             text: `lantern ${i + 1}`,

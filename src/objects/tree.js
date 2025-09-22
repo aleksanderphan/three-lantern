@@ -1,7 +1,7 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Color, PointLight, AmbientLight, DirectionalLight } from 'three';
 
-export function loadTree(scene, path = '/models/cherry_tree.glb') {
+export function loadTree(scene, path = '/models/sakura_tree.glb') {
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader();
 
@@ -16,12 +16,12 @@ export function loadTree(scene, path = '/models/cherry_tree.glb') {
       path,
       (gltf) => {
         const tree = gltf.scene;
-        tree.scale.set(5, 5, 5);
+        tree.scale.set(100, 100, 100);
         tree.position.set(0, -5, 0);
 
         // Moonlight (directional)
         const moonLight = new DirectionalLight(0x99bbff, 1.2);
-        moonLight.position.set(30, 50, 20); // high left, angled
+        moonLight.position.set(30, 50, 20);
         moonLight.castShadow = true;
 
         // Shadow settings for softer look
@@ -33,8 +33,8 @@ export function loadTree(scene, path = '/models/cherry_tree.glb') {
         scene.add(moonLight);
 
         // Soft lantern light near the tree
-        const pointLight = new PointLight(0xffeecc, 100, 3000);
-        pointLight.position.set(-2, 10, 0);
+        const pointLight = new PointLight(0xffeecc, 500);
+        pointLight.position.set(0, 15, 0);
         scene.add(pointLight);
 
         scene.add(tree);

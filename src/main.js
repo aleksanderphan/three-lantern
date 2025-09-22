@@ -69,7 +69,7 @@ let treeModel;
   console.log('Lanterns loaded');
 
   treeModel = await loadTree(scene);
-  console.log('Blender Sakura tree loaded');
+  console.log('Sakura tree loaded');
 })();
 
 // Stars
@@ -196,10 +196,18 @@ window.addEventListener('click', (event) => {
       ease: 'power2.inOut',
       onComplete: () => {
         // After zoom, show popup
-        const clicked = clickedLantern.userData;
-        popupImage.src = `https://placehold.co/200x150.png?text=Lantern`;
-        popupText.textContent = `Lantern :)`;
-        popup.style.display = 'block';
+        let clicked = clickedLantern;
+        while (clicked && !clicked.userData.custom) {
+          clicked = clicked.parent; // climb up until you find the group with your data
+        }
+
+        if (clicked && clicked.userData.custom) {
+          alert(JSON.stringify(clicked.userData));
+          const { image, text } = clicked.userData.custom;
+          popupImage.src = image;
+          popupText.textContent = text;
+          popup.style.display = 'block';
+        }
       },
     });
 
