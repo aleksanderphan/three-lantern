@@ -202,7 +202,6 @@ window.addEventListener('click', (event) => {
         }
 
         if (clicked && clicked.userData.custom) {
-          alert(JSON.stringify(clicked.userData));
           const { image, text } = clicked.userData.custom;
           popupImage.src = image;
           popupText.textContent = text;
