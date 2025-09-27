@@ -52,18 +52,15 @@ export async function createLanterns(
           let banner = null;
           if (metadata.image) {
             const texture = textureLoader.load(metadata.image);
+            const bannerGeometry = new THREE.BoxGeometry(2.5, 4, 0.1);
+            const bannerMaterial = new THREE.MeshBasicMaterial({
+              map: texture,
+              transparent: true,
+              side: THREE.DoubleSide,
+            });
 
-            banner = new THREE.Mesh(
-              new THREE.PlaneGeometry(2.5, 2.5), // width, height
-              new THREE.MeshBasicMaterial({
-                map: texture,
-                transparent: true,
-                side: THREE.DoubleSide,
-              })
-            );
-
-            // Banner position
-            banner.position.set(0, -3, 0);
+            banner = new THREE.Mesh(bannerGeometry, bannerMaterial);
+            banner.position.set(0, -4, 0); // Banner position
 
             lantern.add(banner);
           }
