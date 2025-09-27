@@ -65,7 +65,7 @@ let lanterns = [];
 let treeModel;
 
 (async () => {
-  lanterns = await createLanterns(scene, 50);
+  lanterns = await createLanterns(scene, 10);
   console.log('Lanterns loaded');
 
   treeModel = await loadTree(scene);
@@ -161,6 +161,26 @@ const pointLight = new THREE.PointLight(
 );
 scene.add(pointLight);
 
+// Lantern Animation
+function animateLanterns(lanterns, time) {
+  for (const l of lanterns) {
+    // Flicker light
+    l.light.intensity =
+      30 + // Base brightness
+      Math.sin(time * 6 + l.flickerOffset) * 3 + // Flicker Amount
+      (Math.random() - 0.5) * 5; // Wave
+
+    // Rotate lantern
+    l.mesh.rotation.y += l.rotationSpeed * 25;
+
+    // Swing banner if exists
+    if (l.banner) {
+      l.banner.rotation.z = Math.sin(time * 1.5 + l.swingOffset) * 0.15; // sway side-to-side
+      l.banner.rotation.x = Math.cos(time * 1.2 + l.swingOffset) * 0.05; // small forward-back tilt
+    }
+  }
+}
+
 // Popup close button
 document.getElementById('popupClose').addEventListener('click', (event) => {
   event.stopPropagation(); // prevent click-through to lanterns
@@ -243,6 +263,10 @@ function animate() {
 
   camera.position.y = 12 + Math.sin(time * 0.1) * 0.5;
   controls.update();
+
+  if (lanterns.length) {
+    animateLanterns(lanterns, time);
+  }
 
   composer.render();
 }

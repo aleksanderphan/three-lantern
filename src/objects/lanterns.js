@@ -1,13 +1,18 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-export function createLanterns(
+export async function createLanterns(
   scene,
-  count = 50,
-  modelPath = '/models/lantern.glb'
+  count = 5, // Default value 5
+  modelPath = '/models/lantern.glb',
+  dataPath = '/data.json'
 ) {
+  const response = await fetch(dataPath);
+  const lanternData = await response.json();
+
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader();
+    const textureLoader = new THREE.TextureLoader();
 
     loader.load(
       modelPath,
@@ -40,11 +45,28 @@ export function createLanterns(
           lantern.add(light);
 
           // Extra data
-          lantern.userData.custom = {
-            id: i + 1,
-            image: `https://placehold.co/200x150.png?text=Lantern+${i + 1}`,
-            text: `lantern ${i + 1}`,
-          };
+          const metadata = lanternData[i % lanternData.length];
+          lantern.userData.custom = metadata;
+
+          // Banner
+          let banner = null;
+          if (metadata.image) {
+            const texture = textureLoader.load(metadata.image);
+
+            banner = new THREE.Mesh(
+              new THREE.PlaneGeometry(2.5, 2.5), // width, height
+              new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                side: THREE.DoubleSide,
+              })
+            );
+
+            // Banner position
+            banner.position.set(0, -3, 0);
+
+            lantern.add(banner);
+          }
 
           // Add to scene
           scene.add(lantern);
@@ -55,6 +77,8 @@ export function createLanterns(
             light: light,
             flickerOffset: Math.random() * Math.PI * 2,
             rotationSpeed: (Math.random() - 0.5) * 0.002,
+            banner: banner,
+            swingOffset: Math.random() * Math.PI * 2,
           });
         }
 
