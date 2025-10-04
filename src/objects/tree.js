@@ -1,9 +1,13 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { Color, PointLight, AmbientLight, DirectionalLight } from 'three';
+import { PointLight, AmbientLight, DirectionalLight } from 'three';
 
-export function loadTree(scene, path = '/models/sakura_tree.glb') {
+export function loadTree(
+  scene,
+  path = '/models/sakura_tree.glb',
+  loaderManager
+) {
   return new Promise((resolve, reject) => {
-    const loader = new GLTFLoader();
+    const loader = new GLTFLoader(loaderManager);
 
     // Night sky background
     // scene.background = new Color(0x000010);
@@ -42,9 +46,6 @@ export function loadTree(scene, path = '/models/sakura_tree.glb') {
       },
       (xhr) => {
         if (xhr.total) {
-          console.log(
-            `Tree ${((xhr.loaded / xhr.total) * 100).toFixed(2)}% loaded`
-          );
         }
       },
       (err) => {

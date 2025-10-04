@@ -5,14 +5,15 @@ export async function createLanterns(
   scene,
   count = 5, // Default value 5
   modelPath = '/models/lantern.glb',
-  dataPath = '/data.json'
+  dataPath = '/data.json',
+  loaderManager
 ) {
   const response = await fetch(dataPath);
   const lanternData = await response.json();
 
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader();
-    const textureLoader = new THREE.TextureLoader();
+    const textureLoader = new THREE.TextureLoader(loaderManager);
 
     loader.load(
       modelPath,
@@ -83,11 +84,6 @@ export async function createLanterns(
       },
       (xhr) => {
         if (xhr.total) {
-          console.log(
-            `Lantern model ${((xhr.loaded / xhr.total) * 100).toFixed(
-              2
-            )}% loaded`
-          );
         }
       },
       (err) => {

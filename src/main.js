@@ -9,6 +9,20 @@ import { createLanterns } from './objects/lanterns.js';
 import { loadTree } from './objects/tree.js';
 import { createStars } from './objects/stars.js';
 
+// Loading Manager
+const manager = new THREE.LoadingManager();
+
+manager.onProgress = function (url, itemsLoaded, itemsTotal) {
+  const progress = Math.round((itemsLoaded / itemsTotal) * 100);
+  document.getElementById('progress-text').textContent = `Loading ${progress}%`;
+};
+
+manager.onLoad = function () {
+  const loader = document.getElementById('loader');
+  loader.classList.add('hidden');
+  setTimeout(() => loader.remove(), 800);
+};
+
 // Scene, Camera, Renderer
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d203d);
@@ -65,10 +79,10 @@ let lanterns = [];
 let treeModel;
 
 (async () => {
-  lanterns = await createLanterns(scene, 10);
+  lanterns = await createLanterns(scene, 10, undefined, undefined, manager);
   console.log('Lanterns loaded');
 
-  treeModel = await loadTree(scene);
+  treeModel = await loadTree(scene, undefined, manager);
   console.log('Sakura tree loaded');
 })();
 
