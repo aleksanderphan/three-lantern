@@ -1,298 +1,104 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
-import { createLanterns } from './objects/lanterns.js';
-import { loadTree } from './objects/tree.js';
+import { createRenderer, createCamera, createControls } from './core/renderer.js';
+import { createPostProcessing } from './core/postprocessing.js';
+import { createLoadingManager, showLoadError } from './core/loading.js';
+import { createAtmosphere, createLights } from './objects/lights.js';
+import { createFloor } from './objects/floor.js';
 import { createStars } from './objects/stars.js';
+import { loadTree } from './objects/tree.js';
+import { createLanterns } from './objects/lanterns.js';
+import { createPicker } from './interaction/picker.js';
+import { createCameraRig } from './interaction/cameraRig.js';
+import { createPopup } from './ui/popup.js';
 
-// Loading Manager
-const manager = new THREE.LoadingManager();
-
-manager.onProgress = function (url, itemsLoaded, itemsTotal) {
-  const progress = Math.round((itemsLoaded / itemsTotal) * 100);
-  document.getElementById('progress-text').textContent = `Loading ${progress}%`;
-};
-
-manager.onLoad = function () {
-  const loader = document.getElementById('loader');
-  loader.classList.add('hidden');
-  setTimeout(() => loader.remove(), 800);
-};
-
-// Scene, Camera, Renderer
+// Core
+const manager = createLoadingManager();
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0d203d);
-scene.fog = new THREE.FogExp2(0x0b0c2a, 0.015);
+const camera = createCamera();
+const renderer = createRenderer();
+const controls = createControls(camera, renderer.domElement);
+const { composer, update: updatePost } = createPostProcessing(renderer, scene, camera);
 
-const camera = new THREE.PerspectiveCamera(
-  60,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
-camera.position.set(0, 12, 35);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-document.body.appendChild(renderer.domElement);
-
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 5, 0);
-controls.enablePan = false;
-controls.enableZoom = true;
-// Limit zoom distance
-controls.minDistance = 20;
-controls.maxDistance = 40;
-
-// Lights
-scene.add(new THREE.AmbientLight(0x111122, 0.25));
-const moonLight = new THREE.DirectionalLight(0x99bbff, 1.2);
-moonLight.position.set(-30, 50, -20);
-moonLight.castShadow = true;
-moonLight.shadow.mapSize.set(2048, 2048);
-moonLight.shadow.bias = -0.0001;
-scene.add(moonLight);
-
-// Floor
-const floor = new THREE.Mesh(
-  new THREE.CircleGeometry(64, 64),
-  new THREE.MeshStandardMaterial({
-    color: 0x221a0f,
-    roughness: 1,
-    metalness: 0,
-    emissive: 0x111111,
-  })
-);
-floor.rotation.x = -Math.PI / 2;
-floor.position.y = -5;
-floor.receiveShadow = true;
-scene.add(floor);
-
-// Objects
-let lanterns = [];
-let treeModel;
-
-(async () => {
-  lanterns = await createLanterns(scene, 10, undefined, undefined, manager);
-  console.log('Lanterns loaded');
-
-  treeModel = await loadTree(scene, undefined, manager);
-  console.log('Sakura tree loaded');
-})();
-
-// Stars
+// World
+createAtmosphere(scene);
+createLights(scene);
+createFloor(scene);
 const stars = createStars(scene);
 
-// Bloom & Shader Effects
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
+let lanterns = null;
 
-// UnrealBloomPass (glow effect)
-const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.5, // strength
-  1.8, // radius
-  0.85 // threshold
-);
-composer.addPass(bloomPass);
-
-// Simple color shift shader (optional "dreamy" look)
-const colorShiftShader = {
-  uniforms: { tDiffuse: { value: null }, time: { value: 0 } },
-  vertexShader: `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
-    }`,
-  fragmentShader: `
-    uniform sampler2D tDiffuse;
-    uniform float time;
-    varying vec2 vUv;
-    void main() {
-      vec2 uv = vUv;
-      vec3 col = texture2D(tDiffuse, uv).rgb;
-      col.r += 0.02 * sin(time + uv.y * 10.0);
-      col.b += 0.02 * cos(time + uv.x * 10.0);
-      gl_FragColor = vec4(col, 1.0);
-    }`,
-};
-const colorPass = new ShaderPass(colorShiftShader);
-composer.addPass(colorPass);
-
-// Resize handling
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-});
-
-// Popup
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-const popup = document.getElementById('popup');
-const popupImage = document.getElementById('popupImage');
-const popupText = document.getElementById('popupText');
-// Default camera settings
-const defaultCamPos = new THREE.Vector3(0, 12, 35);
-const defaultTarget = new THREE.Vector3(0, 5, 0);
-
-// Reset camera function
-function resetCamera() {
-  // Smooth transition
-  const duration = 1000; // ms
-  const startPos = camera.position.clone();
-  const startTarget = controls.target.clone();
-  const startTime = performance.now();
-
-  function animateReset(time) {
-    const t = Math.min((time - startTime) / duration, 1);
-
-    // Lerp camera position
-    camera.position.lerpVectors(startPos, defaultCamPos, t);
-
-    // Lerp controls target
-    controls.target.lerpVectors(startTarget, defaultTarget, t);
-
-    if (t < 1) {
-      requestAnimationFrame(animateReset);
-    }
-  }
-
-  requestAnimationFrame(animateReset);
-}
-const pointLight = new THREE.PointLight(
-  0xff929f, // Color
-  800, // Intensity
-  10000 // Distance (How far it reaches)
-);
-scene.add(pointLight);
-
-// Lantern Animation
-function animateLanterns(lanterns, time) {
-  for (const l of lanterns) {
-    // Flicker light
-    l.light.intensity =
-      30 + // Base brightness
-      Math.sin(time * 6 + l.flickerOffset) * 3 + // Flicker Amount
-      (Math.random() - 0.5) * 5; // Wave
-
-    // Rotate lantern
-    l.mesh.rotation.y += l.rotationSpeed * 25;
-
-    // Swing banner if exists
-    if (l.banner) {
-      l.banner.rotation.z = Math.sin(time * 1.5 + l.swingOffset) * 0.15; // sway side-to-side
-      l.banner.rotation.x = Math.cos(time * 1.2 + l.swingOffset) * 0.05; // small forward-back tilt
-    }
-  }
-}
-
-// Popup close button
-document.getElementById('popupClose').addEventListener('click', (event) => {
-  event.stopPropagation(); // prevent click-through to lanterns
-  popup.style.display = 'none';
-
-  resetCamera(); // reset camera after closing popup
-});
-
-window.addEventListener('click', (event) => {
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(mouse, camera);
-
-  const intersects = raycaster.intersectObjects(lanterns.map((l) => l.mesh));
-  if (intersects.length > 0) {
-    const clickedLantern = intersects[0].object;
-
-    // Smooth camera move toward lantern
-    const targetPos = new THREE.Vector3();
-    clickedLantern.getWorldPosition(targetPos);
-
-    const offset = new THREE.Vector3(0, 2, 5); // camera offset from lantern
-    const destination = targetPos.clone().add(offset);
-
-    controls.minDistance = 0;
-    controls.maxDistance = 40;
-
-    gsap.to(camera.position, {
-      duration: 1.5,
-      x: destination.x,
-      y: destination.y,
-      z: destination.z,
-      ease: 'power2.inOut',
-      onComplete: () => {
-        // After zoom, show popup
-        let clicked = clickedLantern;
-        while (clicked && !clicked.userData.custom) {
-          clicked = clicked.parent; // climb up until you find the group with your data
-        }
-
-        if (clicked && clicked.userData.custom) {
-          const { image, text } = clicked.userData.custom;
-          popupImage.src = image;
-          popupText.textContent = text;
-          popup.style.display = 'block';
-        }
-      },
-    });
-
-    gsap.to(controls.target, {
-      duration: 1.5,
-      x: targetPos.x,
-      y: targetPos.y + 1,
-      z: targetPos.z,
-      ease: 'power2.inOut',
-    });
-  }
-});
-
-// Animate
-function animate() {
-  requestAnimationFrame(animate);
-  const time = Date.now() * 0.002;
-
-  lanterns.forEach((l) => {
-    l.mesh.position.y += l.speed;
-    l.mesh.rotation.y += l.rotationSpeed;
-    if (l.mesh.position.y > 20) {
-      l.mesh.position.y = Math.random() * 2 + 4;
-      l.mesh.position.x = (Math.random() - 0.5) * 40;
-      l.mesh.position.z = (Math.random() - 0.5) * 40;
-    }
-    const intensity =
-      0.6 + Math.sin(time + l.flickerOffset) * 0.2 + Math.random() * 0.5;
-    l.light.intensity = intensity;
+Promise.all([createLanterns(scene, manager), loadTree(scene, manager)])
+  .then(([result]) => {
+    lanterns = result;
+  })
+  .catch((err) => {
+    console.error(err);
+    showLoadError('Something went wrong loading the scene. Please refresh.');
   });
 
-  // stars.material.uniforms.time.value = time;
-  colorPass.uniforms.time.value = time * 0.5;
+// Lantern focus + popup
+const rig = createCameraRig(camera, controls);
+let focused = null;
 
-  camera.position.y = 12 + Math.sin(time * 0.1) * 0.5;
-  controls.update();
+const popup = createPopup({
+  onClose: () => {
+    if (focused) focused.paused = false;
+    focused = null;
+    rig.reset();
+  },
+});
 
-  if (lanterns.length) {
-    animateLanterns(lanterns, time);
-  }
+function focusLantern(lantern) {
+  focused = lantern;
+  lantern.paused = true;
+
+  // Turn the banner's front face (+Z) toward where the camera will be
+  const { rotation, position } = lantern.group;
+  const dir = rig.outwardDirection(position);
+  const facing = Math.atan2(dir.x, dir.z);
+  const turn = Math.PI * 2;
+  const y = facing + Math.round((rotation.y - facing) / turn) * turn; // nearest equivalent angle
+  gsap.to(rotation, { y, duration: 1, ease: 'power2.out' });
+
+  rig.focus(lantern.group, () => popup.open(lantern.data));
+}
+
+createPicker({
+  camera,
+  domElement: renderer.domElement,
+  getTargets: () => lanterns?.hitboxes ?? [],
+  isEnabled: () => !focused,
+  onPick: (hitbox) => focusLantern(hitbox.userData.lantern),
+});
+
+// Expose internals in the dev console
+if (import.meta.env.DEV) {
+  Object.assign(window, { THREE, scene, camera, controls, renderer, gsap });
+}
+
+// Resize
+window.addEventListener('resize', () => {
+  const { innerWidth: w, innerHeight: h } = window;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+});
+
+// Loop
+const timer = new THREE.Timer();
+timer.connect(document); // pauses delta while the tab is hidden
+
+renderer.setAnimationLoop((timestamp) => {
+  timer.update(timestamp);
+  const delta = Math.min(timer.getDelta(), 0.1);
+  const elapsed = timer.getElapsed();
+
+  lanterns?.update(delta, elapsed);
+  stars.update(elapsed);
+  updatePost(elapsed);
+  controls.update(delta);
 
   composer.render();
-}
-
-animate();
-
-// Register the service worker once at startup
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(
-      (reg) => console.log('Service worker registered:', reg),
-      (err) => console.error('Service worker registration failed:', err)
-    );
-  });
-}
+});
