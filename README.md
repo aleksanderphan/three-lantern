@@ -1,56 +1,49 @@
 # Three Lantern
 
-Floating paper lanterns rise around a sakura tree under a starry sky. Click a lantern to fly to it and see its photo and caption.
+A moonlit night scene: a sakura island with a little bunny picnic, a landscape of hills, a stone path, a pond with a torii gate, fireflies, and paper lanterns floating up into the sky. Click a lantern to fly to the scroll hanging from it and see its photo and caption.
 
 **Live:** https://three-lantern.vercel.app
 
-Built with [Three.js](https://threejs.org), [GSAP](https://gsap.com) and [Vite](https://vite.dev), and installable as a PWA.
+Built with [Three.js](https://threejs.org), [GSAP](https://gsap.com) and [Vite](https://vite.dev), and installable as a PWA. The whole scene is generated in code, so there are no 3D model files to download.
 
 ## Getting started
 
 ```bash
 npm install
-npm run dev       # http://localhost:5173
-npm run build     # production build into dist/
-npm run preview   # serve the build locally
+npm run dev        # http://localhost:5173
+npm run build      # production build into dist/
+npm run preview    # serve the build locally
+npm run optimize   # regenerate WebP photos + thumbnails from public/images/*.jpeg
 ```
 
 ## Customizing
 
-- **Lantern photos and captions:** edit `public/data.json` (`[{ id, image, text }]`) and put images in `public/images/`. Keep images around 1280px wide and under about 400 KB.
-- **Scene settings** such as lantern count, speeds, camera, bloom and colors are all in `src/config.js`.
+- **Lantern photos and captions:** put JPEGs in `public/images/`, add or edit entries in `public/data.json` (`text`), then run `npm run optimize`. It creates the WebP images and fills in the `image` and `thumb` paths.
+- **Scene look and layout:** tweak the modules in `src/objects/`. For example `landscape.js` (pond position, amount of grass and flowers), `bunnies.js` (bunny layout and scale) and `tree.js` (`TREE_SCALE`, blossom colors).
+- **Lantern count:** the second argument to `createLanterns` in `src/main.js`.
 
 ## Project structure
 
 ```
-index.html                 Page shell (loader, popup, hint)
+index.html                 Page shell: loader, close button, hint, inline CSS
 src/
-  main.js                  Entry: wires everything together and runs the render loop
-  config.js                All tunable values
-  styles.css               UI styles
-  core/
-    renderer.js            Renderer, camera, orbit controls
-    postprocessing.js      Bloom + color-shift passes
-    loading.js             LoadingManager + loading screen
-  objects/                 Things in the scene
-    lights.js              All scene lights, background, fog
-    floor.js
-    stars.js
-    tree.js
-    lanterns.js            Lantern model, glow, banner, animation
-  interaction/
-    picker.js              Pointer raycasting (click + hover)
-    cameraRig.js           Camera fly-to / reset
-  ui/
-    popup.js               Lantern detail popup
-  shaders/
-    colorShift.js
+  main.js                  Renderer, lights, post-processing, lantern zoom interaction, render loop
+  objects/
+    tree.js                Island, trunk, blossoms, falling petals
+    bunnies.js             Bunnies, dango, stone lanterns
+    landscape.js           Terrain, path, pond + torii, trees, rocks, grass, flowers, fireflies
+    lanterns.js            Floating lanterns and their photo scrolls
+    sky.js                 Sky dome, moon, horizon hills
+    stars.js               Star dome
+scripts/
+  optimize-assets.mjs      Photo resizing / WebP conversion
 public/
   data.json                Lantern content
-  images/                  Lantern photos
-  models/                  lantern.glb, sakura_tree.glb
+  images/                  Source JPEGs + generated WebP and thumbnails
   icon.svg                 Favicon / PWA icon
 ```
+
+On phones and tablets the scene drops to a lighter quality tier (no shadows or bloom, less scenery), and the resolution adapts to keep the frame rate smooth.
 
 ## Deployment
 
