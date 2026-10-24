@@ -1,29 +1,32 @@
-// vite.config.js
-import { defineConfig } from 'vite';
-import { VitePWA } from 'vite-plugin-pwa';
+import { defineConfig } from "vite";
+import { VitePWA } from "vite-plugin-pwa";
+
+const cacheFirst = (cacheName, test, maxEntries) => ({
+  urlPattern: ({ url }) => test.test(url.pathname),
+  handler: "CacheFirst",
+  options: {
+    cacheName,
+    expiration: { maxEntries, maxAgeSeconds: 60 * 60 * 24 * 30 },
+    cacheableResponse: { statuses: [0, 200] },
+  },
+});
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: { manualChunks: { three: ["three"], gsap: ["gsap"] } },
+    },
+  },
   plugins: [
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: "autoUpdate",
       workbox: {
-        // Don’t precache giant .glb files
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-
-        // Tell workbox how to cache .glb at runtime
+        // Big binary assets are cached at runtime instead of precached
+        globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        globIgnores: ["models/**", "images/**"],
         runtimeCaching: [
-          {
-            // match any request ending with .glb
-            urlPattern: ({ url }) => url.pathname.endsWith('.glb'),
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'glb-models',
-              expiration: {
-                maxEntries: 5, // keep up to 2 models
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-              },
-            },
-          },
+          cacheFirst("models", /\.(glb|obj)$/i, 60),
+          cacheFirst("images", /\.(webp|jpe?g|png)$/i, 60),
         ],
       },
     }),

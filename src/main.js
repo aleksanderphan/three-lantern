@@ -1,298 +1,308 @@
-import * as THREE from 'three';
-import { gsap } from 'gsap';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
-import { createLanterns } from './objects/lanterns.js';
-import { loadTree } from './objects/tree.js';
-import { createStars } from './objects/stars.js';
+import * as THREE from "three";
+import { gsap } from "gsap";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { createLanterns } from "./objects/lanterns.js";
+import { createTree } from "./objects/tree.js";
+import { createBunnies } from "./objects/bunnies.js";
+import { createLandscape } from "./objects/landscape.js";
+import { createStars } from "./objects/stars.js";
+import { createSky, createHills } from "./objects/sky.js";
 
-// Loading Manager
+// ---------------------------------------------------------------------------
+// Quality tier: phones/tablets skip shadows + bloom and render at lower DPR.
+// ---------------------------------------------------------------------------
+const isLowTier =
+  window.matchMedia("(pointer: coarse)").matches ||
+  Math.min(window.innerWidth, window.innerHeight) < 600 ||
+  (navigator.hardwareConcurrency ?? 8) <= 4;
+
+const MAX_DPR = Math.min(window.devicePixelRatio, isLowTier ? 1.5 : 2);
+const MIN_DPR = 0.75;
+let dpr = MAX_DPR;
+
+// ---------------------------------------------------------------------------
+// Loading
+// ---------------------------------------------------------------------------
+const loaderEl = document.getElementById("loader");
+const progressEl = document.getElementById("progress-text");
 const manager = new THREE.LoadingManager();
-
-manager.onProgress = function (url, itemsLoaded, itemsTotal) {
-  const progress = Math.round((itemsLoaded / itemsTotal) * 100);
-  document.getElementById('progress-text').textContent = `Loading ${progress}%`;
+let pendingAssets = false;
+let onAssetsIdle = null;
+manager.onStart = () => (pendingAssets = true);
+manager.onProgress = (_url, loaded, total) => {
+  progressEl.textContent = `Loading ${Math.round((loaded / total) * 100)}%`;
+};
+manager.onLoad = () => {
+  pendingAssets = false;
+  onAssetsIdle?.();
 };
 
-manager.onLoad = function () {
-  const loader = document.getElementById('loader');
-  loader.classList.add('hidden');
-  setTimeout(() => loader.remove(), 800);
-};
+async function hideLoader() {
+  if (pendingAssets) {
+    // Textures are queued after the models resolve; wait for them (capped).
+    await new Promise((resolve) => {
+      onAssetsIdle = resolve;
+      setTimeout(resolve, 4000);
+    });
+  }
+  loaderEl.classList.add("hidden");
+  setTimeout(() => loaderEl.remove(), 800);
+}
 
-// Scene, Camera, Renderer
+// ---------------------------------------------------------------------------
+// Scene, camera, renderer
+// ---------------------------------------------------------------------------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0d203d);
-scene.fog = new THREE.FogExp2(0x0b0c2a, 0.015);
+scene.fog = new THREE.FogExp2(0x0b1220, 0.006);
 
-const camera = new THREE.PerspectiveCamera(
-  60,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
-camera.position.set(0, 12, 35);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+const defaultCamPos = new THREE.Vector3(0, 13, 44);
+const defaultTarget = new THREE.Vector3(0, 8.5, 0);
+const MIN_DIST = 20;
+const MAX_DIST = 80;
+camera.position.copy(defaultCamPos);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({
+  antialias: false, // MSAA is done on the composer target instead
+  powerPreference: "high-performance",
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = !isLowTier;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.autoUpdate = false; // only static geometry casts; rendered once after load
 document.body.appendChild(renderer.domElement);
+const maxAnisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), isLowTier ? 2 : 8);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 5, 0);
+controls.target.copy(defaultTarget);
 controls.enablePan = false;
-controls.enableZoom = true;
-// Limit zoom distance
-controls.minDistance = 20;
-controls.maxDistance = 40;
+controls.enableDamping = true;
+controls.minDistance = MIN_DIST;
+controls.maxDistance = MAX_DIST;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.25;
 
-// Lights
-scene.add(new THREE.AmbientLight(0x111122, 0.25));
-const moonLight = new THREE.DirectionalLight(0x99bbff, 1.2);
-moonLight.position.set(-30, 50, -20);
-moonLight.castShadow = true;
+// ---------------------------------------------------------------------------
+// Sky + lights
+// ---------------------------------------------------------------------------
+createSky(scene, new THREE.Vector3(-0.4, 0.26, -0.85));
+createHills(scene);
+const stars = createStars(scene, isLowTier ? 1000 : 1800);
+const { petals, groundY } = createTree(scene, { petalCount: isLowTier ? 150 : 350 });
+const bunnies = createBunnies(scene, { groundY, withLights: !isLowTier });
+const landscape = createLandscape(scene, { groundY, quality: isLowTier ? 0.45 : 1 });
+
+scene.add(new THREE.AmbientLight(0x222244, 10.5));
+scene.add(new THREE.HemisphereLight(0x99b3ff, 0x442200, 0.4));
+
+const moonLight = new THREE.DirectionalLight(0x99bbff, 1.8);
+moonLight.position.set(-45, 75, -30);
+moonLight.castShadow = !isLowTier;
 moonLight.shadow.mapSize.set(2048, 2048);
-moonLight.shadow.bias = -0.0001;
+Object.assign(moonLight.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 10, far: 220 });
+moonLight.shadow.bias = -0.0005;
+moonLight.shadow.normalBias = 0.05;
 scene.add(moonLight);
 
-// Floor
+const fillLight = new THREE.DirectionalLight(0x99bbff, 1.2);
+fillLight.position.set(30, 50, 20);
+scene.add(fillLight);
+
+const treeLight = new THREE.PointLight(0xffeecc, 9, 80, 2);
+treeLight.position.set(0, 22, 0);
+scene.add(treeLight);
+
+scene.add(new THREE.PointLight(0xff929f, 2, 100));
+
 const floor = new THREE.Mesh(
-  new THREE.CircleGeometry(64, 64),
-  new THREE.MeshStandardMaterial({
-    color: 0x221a0f,
-    roughness: 1,
-    metalness: 0,
-    emissive: 0x111111,
-  })
+  new THREE.CircleGeometry(300, 48),
+  new THREE.MeshStandardMaterial({ color: 0x1b2e2a, roughness: 1, metalness: 0, emissive: 0x08120f }),
 );
 floor.rotation.x = -Math.PI / 2;
-floor.position.y = -5;
+floor.position.y = -5.06; // just under the terrain so they never z-fight
 floor.receiveShadow = true;
 scene.add(floor);
 
-// Objects
-let lanterns = [];
-let treeModel;
-
-(async () => {
-  lanterns = await createLanterns(scene, 10, undefined, undefined, manager);
-  console.log('Lanterns loaded');
-
-  treeModel = await loadTree(scene, undefined, manager);
-  console.log('Sakura tree loaded');
-})();
-
-// Stars
-const stars = createStars(scene);
-
-// Bloom & Shader Effects
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
-
-// UnrealBloomPass (glow effect)
-const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.5, // strength
-  1.8, // radius
-  0.85 // threshold
+// ---------------------------------------------------------------------------
+// Post-processing: render -> (bloom) -> tone map / sRGB
+// ---------------------------------------------------------------------------
+const composer = new EffectComposer(
+  renderer,
+  new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: isLowTier ? 0 : 4 }),
 );
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.6, 1.0, 1.0);
+bloomPass.enabled = !isLowTier;
 composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
 
-// Simple color shift shader (optional "dreamy" look)
-const colorShiftShader = {
-  uniforms: { tDiffuse: { value: null }, time: { value: 0 } },
-  vertexShader: `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
-    }`,
-  fragmentShader: `
-    uniform sampler2D tDiffuse;
-    uniform float time;
-    varying vec2 vUv;
-    void main() {
-      vec2 uv = vUv;
-      vec3 col = texture2D(tDiffuse, uv).rgb;
-      col.r += 0.02 * sin(time + uv.y * 10.0);
-      col.b += 0.02 * cos(time + uv.x * 10.0);
-      gl_FragColor = vec4(col, 1.0);
-    }`,
-};
-const colorPass = new ShaderPass(colorShiftShader);
-composer.addPass(colorPass);
+function applyResolution() {
+  renderer.setPixelRatio(dpr);
+  composer.setPixelRatio(dpr);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  stars.material.uniforms.pixelRatio.value = dpr;
+  petals.material.uniforms.pixelRatio.value = dpr;
+  landscape.setPixelRatio(dpr);
+}
+applyResolution();
 
-// Resize handling
-window.addEventListener('resize', () => {
+window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
+  applyResolution();
 });
 
-// Popup
+// ---------------------------------------------------------------------------
+// Objects (loaded in parallel)
+// ---------------------------------------------------------------------------
+let lanternSystem = null;
+
+createLanterns(scene, 10, undefined, manager, { maxAnisotropy })
+  .then(async (system) => {
+    lanternSystem = system;
+    renderer.shadowMap.needsUpdate = true; // bake the tree shadow once
+    await renderer.compileAsync(scene, camera); // avoid a first-frame shader hitch
+  })
+  .catch((err) => console.error("Failed to load scene assets:", err))
+  .finally(hideLoader);
+
+// ---------------------------------------------------------------------------
+// Interaction: click a lantern -> the camera flies in to its hanging scroll
+// ---------------------------------------------------------------------------
 const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-const popup = document.getElementById('popup');
-const popupImage = document.getElementById('popupImage');
-const popupText = document.getElementById('popupText');
-// Default camera settings
-const defaultCamPos = new THREE.Vector3(0, 12, 35);
-const defaultTarget = new THREE.Vector3(0, 5, 0);
+const pointer = new THREE.Vector2();
+const closeBtn = document.getElementById("focusClose");
+let focused = null;
 
-// Reset camera function
 function resetCamera() {
-  // Smooth transition
-  const duration = 1000; // ms
-  const startPos = camera.position.clone();
-  const startTarget = controls.target.clone();
-  const startTime = performance.now();
-
-  function animateReset(time) {
-    const t = Math.min((time - startTime) / duration, 1);
-
-    // Lerp camera position
-    camera.position.lerpVectors(startPos, defaultCamPos, t);
-
-    // Lerp controls target
-    controls.target.lerpVectors(startTarget, defaultTarget, t);
-
-    if (t < 1) {
-      requestAnimationFrame(animateReset);
-    }
-  }
-
-  requestAnimationFrame(animateReset);
-}
-const pointLight = new THREE.PointLight(
-  0xff929f, // Color
-  800, // Intensity
-  10000 // Distance (How far it reaches)
-);
-scene.add(pointLight);
-
-// Lantern Animation
-function animateLanterns(lanterns, time) {
-  for (const l of lanterns) {
-    // Flicker light
-    l.light.intensity =
-      30 + // Base brightness
-      Math.sin(time * 6 + l.flickerOffset) * 3 + // Flicker Amount
-      (Math.random() - 0.5) * 5; // Wave
-
-    // Rotate lantern
-    l.mesh.rotation.y += l.rotationSpeed * 25;
-
-    // Swing banner if exists
-    if (l.banner) {
-      l.banner.rotation.z = Math.sin(time * 1.5 + l.swingOffset) * 0.15; // sway side-to-side
-      l.banner.rotation.x = Math.cos(time * 1.2 + l.swingOffset) * 0.05; // small forward-back tilt
-    }
-  }
-}
-
-// Popup close button
-document.getElementById('popupClose').addEventListener('click', (event) => {
-  event.stopPropagation(); // prevent click-through to lanterns
-  popup.style.display = 'none';
-
-  resetCamera(); // reset camera after closing popup
-});
-
-window.addEventListener('click', (event) => {
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(mouse, camera);
-
-  const intersects = raycaster.intersectObjects(lanterns.map((l) => l.mesh));
-  if (intersects.length > 0) {
-    const clickedLantern = intersects[0].object;
-
-    // Smooth camera move toward lantern
-    const targetPos = new THREE.Vector3();
-    clickedLantern.getWorldPosition(targetPos);
-
-    const offset = new THREE.Vector3(0, 2, 5); // camera offset from lantern
-    const destination = targetPos.clone().add(offset);
-
-    controls.minDistance = 0;
-    controls.maxDistance = 40;
-
-    gsap.to(camera.position, {
-      duration: 1.5,
-      x: destination.x,
-      y: destination.y,
-      z: destination.z,
-      ease: 'power2.inOut',
-      onComplete: () => {
-        // After zoom, show popup
-        let clicked = clickedLantern;
-        while (clicked && !clicked.userData.custom) {
-          clicked = clicked.parent; // climb up until you find the group with your data
-        }
-
-        if (clicked && clicked.userData.custom) {
-          const { image, text } = clicked.userData.custom;
-          popupImage.src = image;
-          popupText.textContent = text;
-          popup.style.display = 'block';
-        }
-      },
-    });
-
-    gsap.to(controls.target, {
-      duration: 1.5,
-      x: targetPos.x,
-      y: targetPos.y + 1,
-      z: targetPos.z,
-      ease: 'power2.inOut',
-    });
-  }
-});
-
-// Animate
-function animate() {
-  requestAnimationFrame(animate);
-  const time = Date.now() * 0.002;
-
-  lanterns.forEach((l) => {
-    l.mesh.position.y += l.speed;
-    l.mesh.rotation.y += l.rotationSpeed;
-    if (l.mesh.position.y > 20) {
-      l.mesh.position.y = Math.random() * 2 + 4;
-      l.mesh.position.x = (Math.random() - 0.5) * 40;
-      l.mesh.position.z = (Math.random() - 0.5) * 40;
-    }
-    const intensity =
-      0.6 + Math.sin(time + l.flickerOffset) * 0.2 + Math.random() * 0.5;
-    l.light.intensity = intensity;
+  gsap.killTweensOf([camera.position, controls.target]);
+  gsap.to(camera.position, { duration: 1.2, ease: "power2.inOut", ...defaultCamPos });
+  gsap.to(controls.target, {
+    duration: 1.2,
+    ease: "power2.inOut",
+    ...defaultTarget,
+    onComplete: () => {
+      controls.minDistance = MIN_DIST;
+      controls.autoRotate = true;
+    },
   });
-
-  // stars.material.uniforms.time.value = time;
-  colorPass.uniforms.time.value = time * 0.5;
-
-  camera.position.y = 12 + Math.sin(time * 0.1) * 0.5;
-  controls.update();
-
-  if (lanterns.length) {
-    animateLanterns(lanterns, time);
-  }
-
-  composer.render();
 }
 
-animate();
+function closeFocus() {
+  if (!focused) return;
+  const item = focused;
+  focused = null;
+  item.paused = false;
+  item.setDetail(false);
+  closeBtn.classList.remove("show");
+  resetCamera();
+}
 
-// Register the service worker once at startup
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(
-      (reg) => console.log('Service worker registered:', reg),
-      (err) => console.error('Service worker registration failed:', err)
-    );
+closeBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  closeFocus();
+});
+window.addEventListener("keydown", (e) => e.key === "Escape" && closeFocus());
+
+function focusLantern(item) {
+  if (focused && focused !== item) {
+    focused.paused = false;
+    focused.setDetail(false);
+  }
+  focused = item;
+  item.paused = true; // hold it still; the scroll stays attached to the lantern in 3D
+  item.setDetail(true);
+  controls.autoRotate = false;
+  controls.minDistance = 0;
+  closeBtn.classList.add("show");
+
+  // Stand in front of the scroll, far enough that it fills ~72% of the view height
+  // (and at most 88% of the width on narrow screens). The target sits a little above
+  // the scroll's centre so the strings that hold it stay visible at the top.
+  const { center, normal, width, height } = item.cardPose();
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  const dist = Math.max(height / (0.72 * 2 * tanHalf), width / (0.88 * 2 * tanHalf * camera.aspect));
+  const lift = new THREE.Vector3(0, height * 0.08, 0);
+  const target = center.clone().add(lift);
+  const camPos = center.clone().addScaledVector(normal, dist).add(lift);
+
+  gsap.killTweensOf([camera.position, controls.target]);
+  gsap.to(controls.target, { duration: 1.6, ease: "power2.inOut", x: target.x, y: target.y, z: target.z });
+  gsap.to(camera.position, { duration: 1.6, ease: "power2.inOut", x: camPos.x, y: camPos.y, z: camPos.z });
+}
+
+// Tell a click from an orbit drag so rotating the view never triggers anything.
+let downX = 0;
+let downY = 0;
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  downX = e.clientX;
+  downY = e.clientY;
+});
+renderer.domElement.addEventListener("pointerup", (e) => {
+  if (!lanternSystem || Math.hypot(e.clientX - downX, e.clientY - downY) > 6) return;
+  pointer.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObjects(lanternSystem.pickables, true)[0];
+
+  if (focused) {
+    // While zoomed in, clicking anywhere except the scroll itself backs out
+    if (!hit || hit.object !== focused.bannerCard) closeFocus();
+    return;
+  }
+  if (!hit) return;
+  let root = hit.object;
+  while (root && !root.userData.custom) root = root.parent;
+  const item = lanternSystem.items.find((it) => it.mesh === root);
+  if (item) focusLantern(item);
+});
+controls.addEventListener("start", () => (controls.autoRotate = false));
+
+// ---------------------------------------------------------------------------
+// Main loop with adaptive resolution
+// ---------------------------------------------------------------------------
+const clock = new THREE.Clock();
+let avgFrame = 16;
+let sinceAdjust = 0;
+
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.1);
+  const t = clock.elapsedTime;
+
+  stars.material.uniforms.time.value = t;
+  petals.material.uniforms.time.value = t;
+  bunnies.update(t);
+  landscape.update(t);
+  lanternSystem?.update(dt, t, camera);
+  controls.update(dt);
+  composer.render();
+
+  // Moving average of frame time; trade resolution for smoothness.
+  avgFrame += (dt * 1000 - avgFrame) * 0.05;
+  sinceAdjust += dt;
+  if (sinceAdjust > 2) {
+    sinceAdjust = 0;
+    if (avgFrame > 24 && dpr > MIN_DPR) {
+      dpr = Math.max(MIN_DPR, dpr - 0.25);
+      applyResolution();
+    } else if (avgFrame < 14 && dpr < MAX_DPR) {
+      dpr = Math.min(MAX_DPR, dpr + 0.25);
+      applyResolution();
+    }
+  }
+});
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .catch((err) => console.error("Service worker registration failed:", err));
   });
 }
