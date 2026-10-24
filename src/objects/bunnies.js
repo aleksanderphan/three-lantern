@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-// A small picnic under the tree: bunnies, dango, and stone lanterns that light them.
+// A small picnic under the tree: two bunnies, dango, and stone lanterns that light them.
 // Everything is procedural and shares a handful of geometries/materials.
 
 const sphereGeo = new THREE.SphereGeometry(1, 18, 14); // unit sphere, scaled per use
@@ -35,13 +35,15 @@ function createBunny({ fur = 0xfff4ea, lop = 0, scale = 1 }) {
   const feet = [-1, 1].map((s) => blob(sphereGeo, furMat(fur), s * 0.3, 0.1, 0.15, 0.13, 0.09, 0.24));
   const paws = [-1, 1].map((s) => blob(sphereGeo, furMat(fur), s * 0.17, 0.13, 0.45, 0.09, 0.08, 0.12));
 
+  const nose = blob(sphereGeo, noseMat(), 0, -0.04, 0.37, 0.045, 0.035, 0.035);
+
   // Head group so it can turn independently
   const head = new THREE.Group();
   head.position.set(0, 1.03, 0.2);
   head.add(
     blob(sphereGeo, furMat(fur), 0, 0, 0, 0.4, 0.36, 0.38),
     ...[-1, 1].map((s) => blob(sphereGeo, eyeMat(), s * 0.17, 0.05, 0.33, 0.05)),
-    blob(sphereGeo, noseMat(), 0, -0.04, 0.37, 0.045, 0.035, 0.035),
+    nose,
     ...[-1, 1].map((s) => blob(sphereGeo, cheekMat(), s * 0.27, -0.06, 0.28, 0.07, 0.05, 0.03)),
   );
 
@@ -64,7 +66,7 @@ function createBunny({ fur = 0xfff4ea, lop = 0, scale = 1 }) {
 
   g.add(body, tail, ...feet, ...paws, head);
   g.scale.setScalar(scale);
-  return { group: g, body, head, ears };
+  return { group: g, body, head, ears, tail, nose, feet };
 }
 
 function createSkewer(n = 3) {
@@ -166,7 +168,6 @@ export function createBunnies(scene, { groundY = -4, withLights = true, scale = 
 
   const bunnies = [
     { x: -1.7, z: 2.6, rot: 0.35, opts: { fur: 0xfff4ea, scale: 1.15 }, holdsDango: true },
-    { x: 0.3, z: 3.5, rot: -0.15, opts: { fur: 0xd8d8e2, lop: 0.4, scale: 1.0 } },
     { x: 2.1, z: 2.5, rot: -0.55, opts: { fur: 0xe9cfae, scale: 0.85 } },
   ].map((b, i) => {
     const bunny = createBunny(b.opts);
@@ -222,11 +223,32 @@ export function createBunnies(scene, { groundY = -4, withLights = true, scale = 
       const breathe = Math.sin(t * 2 + b.phase);
       b.body.scale.y = 0.47 * (1 + breathe * 0.02);
       b.head.rotation.y = Math.sin(t * 0.5 + b.phase) * 0.22;
-      b.head.rotation.x = Math.sin(t * 0.8 + b.phase) * 0.04;
       // occasional ear flick
       const flick = Math.max(0, Math.sin(t * 0.7 + b.phase * 3) - 0.9) * 3;
       b.ears[0].rotation.x = flick * 0.6;
       b.ears[1].rotation.x = flick * 0.4;
+
+      // Nose twitch: constant fast little wiggle, stronger in short bursts
+      const burst = 0.4 + 0.6 * Math.max(0, Math.sin(t * 0.9 + b.phase * 2));
+      b.nose.scale.y = 0.035 * (1 + Math.sin(t * 16 + b.phase) * 0.25 * burst);
+
+      // Tail wiggle in occasional bursts
+      const wag = Math.max(0, Math.sin(t * 0.45 + b.phase * 5) - 0.6) * 2.5;
+      b.tail.rotation.z = Math.sin(t * 22) * 0.5 * wag;
+      b.tail.position.x = Math.sin(t * 22) * 0.04 * wag;
+
+      // Nibble: head dips with quick chews for a moment, otherwise a lazy nod
+      const nibble = Math.max(0, Math.sin(t * 0.35 + b.phase * 4) - 0.55) * 2.2;
+      b.head.rotation.x = Math.sin(t * 0.8 + b.phase) * 0.04 + nibble * (0.12 + Math.sin(t * 14) * 0.05);
+
+      // Tiny hop every ~8s, with a little squash before leaving the ground
+      const cycle = (t + b.phase * 2.1) % 8;
+      let hop = 0;
+      let squash = 0;
+      if (cycle < 0.25) squash = Math.sin((cycle / 0.25) * Math.PI) * 0.08;
+      else if (cycle < 0.85) hop = Math.sin(((cycle - 0.25) / 0.6) * Math.PI) * 0.16;
+      b.group.position.y = hop;
+      b.body.scale.y *= 1 - squash;
     }
     for (const l of lamps) {
       const f = 0.85 + Math.sin(t * 7 + l.phase) * 0.08 + Math.sin(t * 17 + l.phase * 2) * 0.05;

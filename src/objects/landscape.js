@@ -290,8 +290,8 @@ function buildTorii(x, y, z, scale = 1) {
   const g = new THREE.Group();
   const red = new THREE.MeshStandardMaterial({ color: 0xb3261e, roughness: 0.6, emissive: 0x3a0a08, emissiveIntensity: 0.5 });
   const black = new THREE.MeshStandardMaterial({ color: 0x1b1418, roughness: 0.7 });
-  const H = 8;
-  const S = 7;
+  const H = 13;
+  const S = 4.5;
   const base = 0;
   for (const s of [-1, 1]) {
     const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, H, 10), red);
@@ -301,7 +301,7 @@ function buildTorii(x, y, z, scale = 1) {
     g.add(pillar, foot);
   }
   const nuki = new THREE.Mesh(new THREE.BoxGeometry(S * 2 + 0.6, 0.38, 0.4), red);
-  nuki.position.set(0, base + H - 2.2, 0);
+  nuki.position.set(0, base + H - 3, 0);
   const kasagi = new THREE.Mesh(new THREE.BoxGeometry(S * 2 + 3.2, 0.55, 0.9), black);
   kasagi.position.set(0, base + H + 0.15, 0);
   const shimaki = new THREE.Mesh(new THREE.BoxGeometry(S * 2 + 2, 0.45, 0.7), red);

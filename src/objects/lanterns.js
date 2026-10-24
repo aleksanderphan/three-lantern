@@ -144,6 +144,24 @@ function wrapText(ctx, text, maxWidth, maxLines) {
   return lines;
 }
 
+/** Darkens the inside edges of a rect, so it reads as recessed. */
+function innerShadow(ctx, r, blur, color) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(r.x, r.y, r.w, r.h);
+  ctx.clip();
+  ctx.shadowColor = color;
+  ctx.shadowBlur = blur;
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 4;
+  ctx.fillStyle = "#000";
+  ctx.beginPath();
+  ctx.rect(r.x - 60, r.y - 60, r.w + 120, r.h + 120);
+  ctx.rect(r.x, r.y, r.w, r.h);
+  ctx.fill("evenodd");
+  ctx.restore();
+}
+
 /**
  * Paints the scroll (frame, photo, caption) onto a canvas texture.
  * Drawing happens in 512x720 logical units; `scale` raises the pixel resolution.
@@ -160,22 +178,69 @@ function createCardTexture(metadata, anisotropy, { scale = 1, url = metadata.thu
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = anisotropy;
 
-  const imgBox = { x: 34, y: 34, w: W - 68, h: Math.round(H * 0.66) };
+  const imgBox = { x: 52, y: 52, w: W - 104, h: Math.round(H * 0.6) };
 
-  ctx.fillStyle = "#f4e8cf"; // washi paper
+  // Red lacquer plaque with a bevel: light catches the top/left edges, shade the bottom/right
+  const lacquer = ctx.createLinearGradient(0, 0, 0, H);
+  lacquer.addColorStop(0, "#c42a1f");
+  lacquer.addColorStop(0.5, "#9c1c14");
+  lacquer.addColorStop(1, "#7a130d");
+  ctx.fillStyle = lacquer;
   ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = "#9c1c14";
-  ctx.lineWidth = 12;
-  ctx.strokeRect(6, 6, W - 12, H - 12);
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "rgba(255,200,170,0.45)";
+  ctx.beginPath();
+  ctx.moveTo(3, H - 3);
+  ctx.lineTo(3, 3);
+  ctx.lineTo(W - 3, 3);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(40,4,2,0.55)";
+  ctx.beginPath();
+  ctx.moveTo(W - 3, 3);
+  ctx.lineTo(W - 3, H - 3);
+  ctx.lineTo(3, H - 3);
+  ctx.stroke();
+
+  // Double gold border
   ctx.strokeStyle = "#d8a93a";
-  ctx.lineWidth = 3;
-  ctx.strokeRect(20, 20, W - 40, H - 40);
-  ctx.fillStyle = "#d9c9a8"; // placeholder until the photo arrives
+  ctx.lineWidth = 4;
+  ctx.strokeRect(14, 14, W - 28, H - 28);
+  ctx.strokeStyle = "rgba(216,169,58,0.8)";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(24, 24, W - 48, H - 48);
+
+  // Washi panel, sunk into the lacquer (inner shadow along its top/left)
+  const panel = { x: 36, y: 36, w: W - 72, h: H - 72 };
+  ctx.fillStyle = "#f4e8cf";
+  ctx.fillRect(panel.x, panel.y, panel.w, panel.h);
+  innerShadow(ctx, panel, 16, "rgba(60,25,10,0.45)");
+
+  // Photo placeholder until the picture arrives
+  ctx.fillStyle = "#d9c9a8";
   ctx.fillRect(imgBox.x, imgBox.y, imgBox.w, imgBox.h);
 
   // Caption, shrunk until it fits under the photo
-  const top = imgBox.y + imgBox.h + 18;
-  const bottom = H - 34;
+  const top = imgBox.y + imgBox.h + 40;
+  const bottom = H - 56;
+  // Gold diamond divider between photo and caption
+  const dy = imgBox.y + imgBox.h + 22;
+  ctx.strokeStyle = "rgba(156,28,20,0.5)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(imgBox.x + 40, dy);
+  ctx.lineTo(W / 2 - 16, dy);
+  ctx.moveTo(W / 2 + 16, dy);
+  ctx.lineTo(imgBox.x + imgBox.w - 40, dy);
+  ctx.stroke();
+  ctx.fillStyle = "#b8892f";
+  ctx.beginPath();
+  ctx.moveTo(W / 2, dy - 7);
+  ctx.lineTo(W / 2 + 7, dy);
+  ctx.lineTo(W / 2, dy + 7);
+  ctx.lineTo(W / 2 - 7, dy);
+  ctx.closePath();
+  ctx.fill();
+
   ctx.fillStyle = "#3a1a10";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -183,7 +248,7 @@ function createCardTexture(metadata, anisotropy, { scale = 1, url = metadata.thu
   let lines;
   do {
     ctx.font = `600 ${size}px Georgia, "Times New Roman", serif`;
-    lines = wrapText(ctx, metadata.text ?? "", W - 90, 4);
+    lines = wrapText(ctx, metadata.text ?? "", W - 130, 4);
     size -= 2;
   } while (lines.length * size * 1.3 > bottom - top && size > 18);
   const lh = size * 1.3;
@@ -198,9 +263,10 @@ function createCardTexture(metadata, anisotropy, { scale = 1, url = metadata.thu
       const sw = imgBox.w / s;
       const sh = imgBox.h / s;
       ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, imgBox.x, imgBox.y, imgBox.w, imgBox.h);
+      innerShadow(ctx, imgBox, 14, "rgba(0,0,0,0.6)"); // photo sits recessed in the panel
       ctx.strokeStyle = "#d8a93a";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(imgBox.x, imgBox.y, imgBox.w, imgBox.h);
+      ctx.lineWidth = 3;
+      ctx.strokeRect(imgBox.x - 1.5, imgBox.y - 1.5, imgBox.w + 3, imgBox.h + 3);
       tex.needsUpdate = true;
       onReady?.();
     };
@@ -222,14 +288,19 @@ function buildBanner(metadata, anisotropy, shared) {
   );
   card.position.set(0, ROD_Y - CARD_H / 2, 0);
 
-  const back = new THREE.Mesh(shared.cardGeometry, shared.backMaterial);
-  back.rotation.y = Math.PI;
-  back.position.set(0, ROD_Y - CARD_H / 2, -0.01);
+  // A lacquered slab behind the painted face gives the scroll real thickness
+  const back = new THREE.Mesh(shared.slabGeometry, shared.slabMaterial);
+  back.position.set(0, ROD_Y - CARD_H / 2, -0.045);
 
   const rod = new THREE.Mesh(shared.rodGeometry, shared.rodMaterial);
   rod.position.set(0, ROD_Y + 0.02, 0);
 
-  pivot.add(card, back, rod, new THREE.Line(shared.stringGeometry, shared.stringMaterial));
+  const capL = new THREE.Mesh(shared.capGeometry, shared.capMaterial);
+  capL.position.set(-(CARD_W + 0.25) / 2, ROD_Y + 0.02, 0);
+  const capR = capL.clone();
+  capR.position.x *= -1;
+
+  pivot.add(card, back, rod, capL, capR, new THREE.Line(shared.stringGeometry, shared.stringMaterial));
   return { pivot, card };
 }
 
@@ -245,7 +316,10 @@ export async function createLanterns(
 
   const shared = {
     cardGeometry: new THREE.PlaneGeometry(CARD_W, CARD_H),
-    backMaterial: new THREE.MeshBasicMaterial({ color: 0xe9d9b5 }),
+    slabGeometry: new THREE.BoxGeometry(CARD_W + 0.08, CARD_H + 0.08, 0.08),
+    slabMaterial: new THREE.MeshStandardMaterial({ color: 0x8a160f, roughness: 0.4, metalness: 0.2 }),
+    capGeometry: new THREE.SphereGeometry(0.075, 10, 8),
+    capMaterial: new THREE.MeshStandardMaterial({ color: 0xd8a93a, roughness: 0.35, metalness: 0.6 }),
     rodGeometry: new THREE.CylinderGeometry(0.04, 0.04, CARD_W + 0.25, 6).rotateZ(Math.PI / 2),
     rodMaterial: new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.7 }),
     stringGeometry: new THREE.BufferGeometry().setFromPoints([
@@ -297,36 +371,10 @@ export async function createLanterns(
       swingOffset: Math.random() * Math.PI * 2,
       paused: false,
       sway: 1, // eased to 0 while focused so the scroll settles before the camera arrives
-      lowMap: banner.card.material.map,
-      hiMap: null,
     });
   }
 
-  // While a scroll is focused, swap in a 2x texture with the full-size photo so the
-  // text and picture stay sharp at close range. The small one comes back afterwards.
   for (const item of items) {
-    item.setDetail = (on) => {
-      const mat = item.bannerCard.material;
-      if (on && !item.hiMap) {
-        const meta = item.mesh.userData.custom;
-        const hi = createCardTexture(meta, maxAnisotropy, {
-          scale: 2,
-          url: meta.image,
-          onReady: () => {
-            if (item.hiMap !== hi) return; // already unfocused
-            mat.map = hi;
-            mat.needsUpdate = true;
-          },
-        });
-        item.hiMap = hi;
-      } else if (!on && item.hiMap) {
-        mat.map = item.lowMap;
-        mat.needsUpdate = true;
-        item.hiMap.dispose();
-        item.hiMap = null;
-      }
-    };
-
     // World-space pose of the settled (un-swung) scroll, for camera framing
     item.cardPose = () => {
       item.mesh.updateWorldMatrix(true, false);
@@ -347,15 +395,24 @@ export async function createLanterns(
     scene.add(l);
     return l;
   });
-  const assigned = new Array(LIGHT_POOL).fill(null);
+  const assigned = new Array(LIGHT_POOL).fill(null); // wanted lantern per slot
+  const current = new Array(LIGHT_POOL).fill(null); // lantern the slot is actually lighting
+  const fade = new Array(LIGHT_POOL).fill(0);
   const world = new THREE.Vector3();
   let assignTimer = 0;
 
   function assignLights(camera) {
-    const ranked = items
+    const top = items
       .map((it) => ({ it, d: it.mesh.position.distanceToSquared(camera.position) }))
-      .sort((a, b) => a.d - b.d);
-    for (let i = 0; i < LIGHT_POOL; i++) assigned[i] = ranked[i]?.it ?? null;
+      .sort((a, b) => a.d - b.d)
+      .slice(0, LIGHT_POOL)
+      .map((r) => r.it);
+    // Keep slots on their lantern while it's still in the nearest set; only free slots change
+    const free = top.filter((it) => !current.includes(it) && !assigned.includes(it));
+    for (let i = 0; i < LIGHT_POOL; i++) {
+      if (top.includes(current[i])) assigned[i] = current[i];
+      else assigned[i] = free.shift() ?? null;
+    }
   }
 
   function update(dt, time, camera) {
@@ -383,17 +440,30 @@ export async function createLanterns(
       it.banner.rotation.x = Math.cos(time * 1.2 + it.swingOffset) * 0.05 * sway;
     }
 
+    // A slot fades out, snaps to its new lantern while dark, then fades back in,
+    // so a light never slides across the scene or pops when the camera orbits.
     for (let i = 0; i < LIGHT_POOL; i++) {
-      const it = assigned[i];
       const light = lights[i];
+      if (current[i] !== assigned[i]) {
+        fade[i] = Math.max(0, fade[i] - dt * 6);
+        if (fade[i] === 0) {
+          current[i] = assigned[i];
+          if (current[i]) light.position.copy(current[i].mesh.position);
+        }
+      } else if (current[i]) {
+        fade[i] = Math.min(1, fade[i] + dt * 4);
+      }
+      const it = current[i];
       if (!it) {
         light.intensity = 0;
         continue;
       }
       world.copy(it.mesh.position);
       world.y += 0.3;
-      light.position.lerp(world, Math.min(1, dt * 8));
-      light.intensity = 25 * (0.8 + Math.sin(time * 6 + it.flickerOffset) * 0.15);
+      // Follow the lantern directly; if it respawned far away, snap instead of streaking
+      if (light.position.distanceToSquared(world) > 4) light.position.copy(world);
+      else light.position.lerp(world, Math.min(1, dt * 8));
+      light.intensity = 25 * fade[i] * (0.8 + Math.sin(time * 6 + it.flickerOffset) * 0.15);
     }
   }
 
@@ -406,8 +476,7 @@ export async function createLanterns(
     glowMap.dispose();
     items.forEach((it) => {
       it.glow.material.dispose();
-      it.lowMap.dispose();
-      it.hiMap?.dispose();
+      it.bannerCard.material.map.dispose();
       it.bannerCard.material.dispose();
       scene.remove(it.mesh);
     });

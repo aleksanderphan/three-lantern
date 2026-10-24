@@ -53,7 +53,7 @@ dist/                          Build output; git-ignored (Vercel builds on deplo
 - **Units:** world units; the floor is at `FLOOR_Y` (-5). The island is scaled by `TREE_SCALE` about the point under the trunk, and `createTree` returns `groundY` (the island's top). Pass that to `createBunnies` and `createLandscape`.
 - **Bunny scene** is authored at 1x in `bunnies.js` and scaled up in code; positions are in that 1x space.
 - **Landscape scatter** keeps the area in front of the camera (the path, pond, bunnies, lantern ring) clear. If you add objects, check the view from the default camera in `main.js`.
-- **Lanterns** spawn in a ring around the island and never on the camera's side (`z <= 16`). Focusing one pauses it and swaps its scroll to a 2x texture with the full-size photo (`item.setDetail`).
+- **Lanterns** spawn in a ring around the island and never on the camera's side (`z <= 16`). Focusing one pauses it; its scroll keeps the same thumbnail texture.
 - **Interaction:** a click (not an orbit drag) on a lantern calls `focusLantern`; the camera flies to the scroll using `item.cardPose()`. Esc, the × button, or a click anywhere except the scroll calls `closeFocus`.
 
 ## Conventions

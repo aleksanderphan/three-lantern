@@ -99,11 +99,15 @@ const { petals, groundY } = createTree(scene, { petalCount: isLowTier ? 150 : 35
 const bunnies = createBunnies(scene, { groundY, withLights: !isLowTier });
 const landscape = createLandscape(scene, { groundY, quality: isLowTier ? 0.45 : 1 });
 
-scene.add(new THREE.AmbientLight(0x222244, 10.5));
-scene.add(new THREE.HemisphereLight(0x99b3ff, 0x442200, 0.4));
+// Moonlit night: cool sky bounce from above, dark green-brown bounce from the ground,
+// and just a touch of ambient so the shadow side never goes pure black.
+scene.add(new THREE.AmbientLight(0x1a2240, 0.6));
+scene.add(new THREE.HemisphereLight(0x6f8fd8, 0x1c1a14, 0.9));
 
-const moonLight = new THREE.DirectionalLight(0x99bbff, 1.8);
-moonLight.position.set(-45, 75, -30);
+// Key light: the moon, placed on its side of the sky (behind and left of the island)
+// so the tree throws its shadow toward the camera.
+const moonLight = new THREE.DirectionalLight(0xaec6ff, 2.2);
+moonLight.position.set(-50, 65, -55);
 moonLight.castShadow = !isLowTier;
 moonLight.shadow.mapSize.set(2048, 2048);
 Object.assign(moonLight.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 10, far: 220 });
@@ -111,15 +115,16 @@ moonLight.shadow.bias = -0.0005;
 moonLight.shadow.normalBias = 0.05;
 scene.add(moonLight);
 
-const fillLight = new THREE.DirectionalLight(0x99bbff, 1.2);
-fillLight.position.set(30, 50, 20);
+// Fill from the camera side, dim and slightly cooler/dimmer than the key, so the
+// front of the island keeps form instead of silhouetting against the moon.
+const fillLight = new THREE.DirectionalLight(0x7f9ae0, 0.5);
+fillLight.position.set(30, 25, 50);
 scene.add(fillLight);
 
-const treeLight = new THREE.PointLight(0xffeecc, 9, 80, 2);
-treeLight.position.set(0, 22, 0);
+// Warm glow from the lanterns and picnic lighting up the blossoms from below/inside.
+const treeLight = new THREE.PointLight(0xffd9a8, 40, 60, 2);
+treeLight.position.set(0, 14, 0);
 scene.add(treeLight);
-
-scene.add(new THREE.PointLight(0xff929f, 2, 100));
 
 const floor = new THREE.Mesh(
   new THREE.CircleGeometry(300, 48),
@@ -201,7 +206,6 @@ function closeFocus() {
   const item = focused;
   focused = null;
   item.paused = false;
-  item.setDetail(false);
   closeBtn.classList.remove("show");
   document.body.classList.remove("focused");
   resetCamera();
@@ -216,11 +220,9 @@ window.addEventListener("keydown", (e) => e.key === "Escape" && closeFocus());
 function focusLantern(item) {
   if (focused && focused !== item) {
     focused.paused = false;
-    focused.setDetail(false);
   }
   focused = item;
   item.paused = true; // hold it still; the scroll stays attached to the lantern in 3D
-  item.setDetail(true);
   controls.autoRotate = false;
   controls.minDistance = 0;
   closeBtn.classList.add("show");
