@@ -203,6 +203,7 @@ function closeFocus() {
   item.paused = false;
   item.setDetail(false);
   closeBtn.classList.remove("show");
+  document.body.classList.remove("focused");
   resetCamera();
 }
 
@@ -223,6 +224,7 @@ function focusLantern(item) {
   controls.autoRotate = false;
   controls.minDistance = 0;
   closeBtn.classList.add("show");
+  document.body.classList.add("focused");
 
   // Stand in front of the scroll, far enough that it fills ~72% of the view height
   // (and at most 88% of the width on narrow screens). The target sits a little above

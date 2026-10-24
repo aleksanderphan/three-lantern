@@ -2,8 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ThreeJS Lantern</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Floating paper lanterns rise around a sakura tree under a starry sky." />
+    <meta name="theme-color" content="#0a0a14" />
+    <title>Three Lantern</title>
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
     <style>
       body {
         margin: 0;
@@ -47,6 +51,26 @@
         font-size: 14px;
       }
 
+      .hint {
+        position: fixed;
+        bottom: max(16px, env(safe-area-inset-bottom));
+        left: 50%;
+        transform: translateX(-50%);
+        margin: 0;
+        padding: 0.4em 0.9em;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.35);
+        color: #fff;
+        font-size: 13px;
+        opacity: 0.75;
+        pointer-events: none;
+        white-space: nowrap;
+        transition: opacity 0.4s ease;
+      }
+      body.focused .hint {
+        opacity: 0;
+      }
+
       /* Close button shown while the camera is zoomed on a hanging scroll */
       #focusClose {
         position: fixed;
@@ -88,6 +112,8 @@
       <div class="spinner"></div>
       <p id="progress-text">Loading 0%</p>
     </div>
+
+    <p class="hint">Drag to look around · Tap a lantern</p>
 
     <script type="module" src="src/main.js"></script>
   </body>

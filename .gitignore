@@ -1,29 +1,23 @@
 # Dependencies
 node_modules/
 
-# Build output
-# (dist/ is currently committed; run `git rm -r --cached dist` and add it here to stop tracking it)
+# Build output (Vercel builds on deploy)
+dist/
 dev-dist/
-*.local
 
 # Logs
 *.log
 npm-debug.log*
 
-# Environment
+# Env
 .env
 .env.*
 !.env.example
 
-# Editors
+# Editor / OS
 .vscode/*
-!.vscode/settings.json
 !.vscode/extensions.json
 .idea/
-*.suo
-*.user
-
-# OS
 .DS_Store
 Thumbs.db
 
