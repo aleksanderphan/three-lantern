@@ -88,6 +88,13 @@ controls.maxDistance = MAX_DIST;
 controls.maxPolarAngle = Math.PI * 0.49;
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.25;
+// Wheel zoom aims at the cursor, pinch zoom at the midpoint between the fingers. This moves
+// the orbit target toward that point, so it's clamped each frame (see the main loop).
+controls.zoomToCursor = true;
+controls.zoomSpeed = 0.8;
+controls.dampingFactor = 0.06;
+const TARGET_LIMIT = { radius: 30, minY: 0, maxY: 24 };
+const CAMERA_MIN_Y = -3; // keep the camera above the terrain
 
 // ---------------------------------------------------------------------------
 // Sky + lights
@@ -286,6 +293,22 @@ renderer.setAnimationLoop(() => {
   landscape.update(t);
   lanternSystem?.update(dt, t, camera);
   controls.update(dt);
+  if (!focused) {
+    // Zooming toward a point shifts the orbit target; keep it near the island, and ease it
+    // back toward the centre as the user zooms out so the default framing is always reachable.
+    const tg = controls.target;
+    const r = Math.hypot(tg.x, tg.z);
+    if (r > TARGET_LIMIT.radius) {
+      tg.x *= TARGET_LIMIT.radius / r;
+      tg.z *= TARGET_LIMIT.radius / r;
+    }
+    tg.y = THREE.MathUtils.clamp(tg.y, TARGET_LIMIT.minY, TARGET_LIMIT.maxY);
+    const zoomedOut = THREE.MathUtils.smoothstep(camera.position.distanceTo(tg), MAX_DIST * 0.6, MAX_DIST);
+    if (zoomedOut > 0 && !gsap.isTweening(tg)) {
+      tg.lerp(defaultTarget, 1 - Math.exp(-dt * 3 * zoomedOut));
+    }
+    if (camera.position.y < CAMERA_MIN_Y) camera.position.y = CAMERA_MIN_Y;
+  }
   composer.render();
 
   // Moving average of frame time; trade resolution for smoothness.
