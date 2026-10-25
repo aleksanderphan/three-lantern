@@ -6,7 +6,7 @@ Upcoming features for the admin dashboard (`admin` branch).
 
 - [x] QR code, stylized card (PNG), and copy link on each site's page (`src/admin/share.js`).
 - [x] Search box on the sites list: title or uuid, pasted site links work.
-- [x] Site expiration: date per site, shown in the dashboard; expired sites show no lanterns (RLS in `supabase/schema.sql`).
+- [x] Site expiration: date per site, shown in the dashboard; expired sites render nothing (blank page, scene never loaded) (RLS in `supabase/schema.sql`).
 
 ## Upcoming
 
