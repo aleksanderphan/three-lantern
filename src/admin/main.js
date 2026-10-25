@@ -14,7 +14,11 @@ const app = document.getElementById("app");
 // The dashboard lives on its own subdomain (admin.<domain>). Anywhere else (the public site,
 // <uuid>.<domain>, *.vercel.app) it refuses to start; vercel.json also redirects /admin.html away.
 // `npm run dev` on localhost is allowed so it can be built and tested.
-const onAdminHost = location.hostname.split(".")[0] === "admin" || (import.meta.env.DEV && /^(localhost|127\.0\.0\.1)$/.test(location.hostname));
+// Temporary: the `admin` git branch is deployed as a Vercel preview, so allow *.vercel.app too.
+const onAdminHost =
+  location.hostname.split(".")[0] === "admin" ||
+  location.hostname.endsWith(".vercel.app") ||
+  (import.meta.env.DEV && /^(localhost|127\.0\.0\.1)$/.test(location.hostname));
 if (!onAdminHost) {
   location.replace("/");
   throw new Error("Admin dashboard is only available on the admin subdomain");
@@ -322,17 +326,28 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 let session = null;
 
 async function route() {
-  if (!session) return renderLogin();
+  // No session: always the login page (no sign-up; accounts are created in Supabase by hand).
+  if (!session) {
+    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+    return renderLogin();
+  }
   who.textContent = session.user.email;
   logoutBtn.hidden = false;
   const id = location.hash.replace(/^#\//, "");
+  // Anything that isn't a site UUID (empty, stale or unknown hash) lands on the dashboard.
+  if (id && !UUID.test(id)) history.replaceState(null, "", location.pathname + location.search + "#/");
   await guard(() => (UUID.test(id) ? renderSite(id) : renderSites()));
 }
 
 logoutBtn.addEventListener("click", () => sb.auth.signOut());
 window.addEventListener("hashchange", route);
+let routed = false;
 sb.auth.onAuthStateChange((_event, s) => {
   const changed = (s?.user.id ?? null) !== (session?.user.id ?? null);
   session = s;
-  if (changed) route(); // token refreshes shouldn't redraw (and lose unsaved captions)
+  // The first event must always draw: a signed-out visitor goes null -> null and still needs the login page.
+  if (changed || !routed) {
+    routed = true;
+    route(); // token refreshes shouldn't redraw (and lose unsaved captions)
+  }
 });
