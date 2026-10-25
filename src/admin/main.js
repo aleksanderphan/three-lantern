@@ -4,6 +4,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { makeVariants } from "./images.js";
 import { DEFAULT_ID, MAX_LANTERNS, isExpired } from "../site.js";
+import { siteUrl, qrCanvas, qrPng, qrCardPng, download } from "./share.js";
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -331,6 +332,23 @@ async function renderSite(id) {
   }
   drawGrid();
 
+  // Share: QR code for the site's public link, plus a stylized card, both as PNG downloads.
+  const url = siteUrl(id);
+  const qrBox = h("div", { className: "qr" });
+  qrCanvas(url, 320).then((c) => qrBox.replaceChildren(c)).catch(() => qrBox.replaceChildren("QR unavailable"));
+  const share = h("div", { className: "share" },
+    qrBox,
+    h("div", { className: "grow" },
+      h("div", { className: "muted" }, "Share this site"),
+      h("a", { className: "mono", href: url, target: "_blank", rel: "noopener" }, url),
+      h("div", { className: "row", style: "margin-top:10px" },
+        h("button", { onclick: () => navigator.clipboard.writeText(url).then(() => toast("Link copied")) }, "Copy link"),
+        h("button", { onclick: () => guard(async () => download(await qrPng(url), `qr-${id}.png`)) }, "Download QR"),
+        h("button", { onclick: () => guard(async () => download(await qrCardPng(url, titleInput.value.trim() || site.title), `qr-card-${id}.png`)) }, "Download card"),
+      ),
+    ),
+  );
+
   app.replaceChildren(
     h("p", {}, h("a", { href: "#/" }, "← All sites")),
     h("h2", {}, site.title || "(untitled)"),
@@ -341,6 +359,7 @@ async function renderSite(id) {
     ),
     h("div", { className: "row", style: "margin-top:14px" }, titleInput, saveTitle, del),
     expiry,
+    share,
     counter,
     drop,
     fileInput,
