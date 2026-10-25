@@ -245,7 +245,17 @@ function focusLantern(item) {
   // Stand in front of the scroll, far enough that it fills ~72% of the view height
   // (and at most 88% of the width on narrow screens). The target sits a little above
   // the scroll's centre so the strings that hold it stay visible at the top.
+  // Lanterns spin as they drift, so turn this one to show its scroll to the camera first.
+  const mesh = item.mesh;
+  const startYaw = mesh.rotation.y;
+  const turn = Math.atan2(camera.position.x - mesh.position.x, camera.position.z - mesh.position.z) - startYaw;
+  const wrapped = Math.atan2(Math.sin(turn), Math.cos(turn)); // shortest way round
+  mesh.rotation.y = startYaw + wrapped;
   const { center, normal, width, height } = item.cardPose();
+  mesh.rotation.y = startYaw;
+  gsap.killTweensOf(mesh.rotation);
+  gsap.to(mesh.rotation, { duration: 1.2, ease: "power2.inOut", y: startYaw + wrapped });
+  item.sharpen();
   const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
   const dist = Math.max(height / (0.72 * 2 * tanHalf), width / (0.88 * 2 * tanHalf * camera.aspect));
   const lift = new THREE.Vector3(0, height * 0.08, 0);
