@@ -148,7 +148,7 @@ scene.add(floor);
 // ---------------------------------------------------------------------------
 const composer = new EffectComposer(
   renderer,
-  new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: isLowTier ? 0 : 4 }),
+  new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: isLowTier ? 2 : 4 }),
 );
 composer.addPass(new RenderPass(scene, camera));
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.6, 1.0, 1.0);
