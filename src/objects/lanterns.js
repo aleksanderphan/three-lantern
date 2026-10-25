@@ -369,11 +369,31 @@ export async function createLanterns(
       flickerOffset: Math.random() * Math.PI * 2,
       swingOffset: Math.random() * Math.PI * 2,
       paused: false,
+      sharpened: false,
       sway: 1, // eased to 0 while focused so the scroll settles before the camera arrives
     });
   }
 
   for (const item of items) {
+    // The banner texture starts as the small thumbnail; swap in the full photo at 2x once
+    // a lantern is focused so the close-up isn't blurry or over-cropped.
+    item.sharpen = () => {
+      if (item.sharpened) return;
+      item.sharpened = true;
+      const data = item.mesh.userData.custom;
+      if (!data.image) return;
+      const tex = createCardTexture(data, maxAnisotropy, {
+        scale: 2,
+        url: data.image,
+        onReady: () => {
+          const mat = item.bannerCard.material;
+          mat.map.dispose();
+          mat.map = tex;
+          mat.needsUpdate = true;
+        },
+      });
+    };
+
     // World-space pose of the settled (un-swung) scroll, for camera framing
     item.cardPose = () => {
       item.mesh.updateWorldMatrix(true, false);
