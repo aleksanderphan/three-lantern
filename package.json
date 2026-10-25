@@ -19,6 +19,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
     "gsap": "^3.13.0",
+    "qrcode": "^1.5.4",
     "three": "^0.180.0"
   }
 }
