@@ -326,17 +326,28 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 let session = null;
 
 async function route() {
-  if (!session) return renderLogin();
+  // No session: always the login page (no sign-up; accounts are created in Supabase by hand).
+  if (!session) {
+    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+    return renderLogin();
+  }
   who.textContent = session.user.email;
   logoutBtn.hidden = false;
   const id = location.hash.replace(/^#\//, "");
+  // Anything that isn't a site UUID (empty, stale or unknown hash) lands on the dashboard.
+  if (id && !UUID.test(id)) history.replaceState(null, "", location.pathname + location.search + "#/");
   await guard(() => (UUID.test(id) ? renderSite(id) : renderSites()));
 }
 
 logoutBtn.addEventListener("click", () => sb.auth.signOut());
 window.addEventListener("hashchange", route);
+let routed = false;
 sb.auth.onAuthStateChange((_event, s) => {
   const changed = (s?.user.id ?? null) !== (session?.user.id ?? null);
   session = s;
-  if (changed) route(); // token refreshes shouldn't redraw (and lose unsaved captions)
+  // The first event must always draw: a signed-out visitor goes null -> null and still needs the login page.
+  if (changed || !routed) {
+    routed = true;
+    route(); // token refreshes shouldn't redraw (and lose unsaved captions)
+  }
 });
