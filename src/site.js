@@ -57,7 +57,7 @@ async function fetchSupabase(id) {
   ]);
   if (!sites.length) throw new Error(`supabase: no content for ${id}`);
   // Expired sites have no readable lanterns (RLS); report that instead of falling back to the default.
-  if (isExpired(sites[0].expires_at)) return { title: sites[0].title, lanterns: [], expired: true };
+  if (isExpired(sites[0].expires_at)) return { lanterns: [], expired: true };
   if (!rows.length) throw new Error(`supabase: no content for ${id}`);
   return {
     title: sites[0].title,
@@ -71,7 +71,11 @@ export const MAX_LANTERNS = 10;
 // The bare domain shows this reserved site (migrated from public/data.json, editable in the dashboard).
 export const DEFAULT_ID = "00000000-0000-0000-0000-000000000000";
 
-export async function loadSiteContent() {
+// Memoized: the entry gate and the scene both ask for it, but it should be fetched once.
+let content;
+export const loadSiteContent = () => (content ??= fetchSiteContent());
+
+async function fetchSiteContent() {
   const id = siteId();
   if (SB_URL && SB_KEY) {
     try {
