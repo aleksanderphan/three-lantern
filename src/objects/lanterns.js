@@ -307,11 +307,10 @@ function buildBanner(metadata, anisotropy, shared) {
 export async function createLanterns(
   scene,
   count = 5,
-  dataPath = "/data.json",
+  lanternData,
   manager,
   { maxAnisotropy = 4 } = {},
 ) {
-  const lanternData = await fetch(dataPath).then((r) => r.json());
   const parts = buildLanternParts();
 
   const shared = {

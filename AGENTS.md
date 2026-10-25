@@ -19,7 +19,8 @@ npm install        # install dependencies
 npm run dev        # dev server with HMR (http://localhost:5173)
 npm run build      # production build into dist/
 npm run preview    # serve the built dist/ locally
-npm run optimize   # regenerate the WebP photos + thumbnails from public/images/*.jpeg and rewrite data.json
+npm run optimize   # regenerate WebP photos + thumbnails from */images/*.jpeg (default + every site) and rewrite data.json
+npm run new-site   # create public/sites/<uuid>/ for a new content set (optional title argument)
 ```
 
 There are no tests, linter, or formatter scripts. To check a change, run `npm run build` and look at it in the browser (`npm run dev` or `npm run preview`).
@@ -28,6 +29,7 @@ There are no tests, linter, or formatter scripts. To check a change, run `npm ru
 
 ```
 index.html                     Page shell: loader, close button, hint, and all CSS (inline <style>)
+src/site.js                    loadSiteContent(): picks the content set from the <uuid> subdomain or ?site=<uuid>
 src/main.js                    Entry point: quality tier, renderer, camera, lights, post-processing,
                                lantern focus/zoom interaction, render loop with adaptive resolution
 src/objects/tree.js            createTree(): island, branching trunk, instanced blossoms, falling petals.
@@ -41,8 +43,10 @@ src/objects/lanterns.js        createLanterns(): procedural paper lanterns + han
 src/objects/sky.js             createSky() (gradient dome, moon, glow) and createHills() (horizon silhouettes)
 src/objects/stars.js           createStars(): twinkling star dome, animated in the shader
 scripts/optimize-assets.mjs    Resizes photos to WebP (popup size + thumbnails) and updates data.json
-public/data.json               Lantern content: [{ id, image, thumb, text }]; lanterns cycle through it
+scripts/new-site.mjs           Scaffolds public/sites/<uuid>/ with data.json + images/
+public/data.json               Default lantern content: [{ id, image, thumb, text }]; lanterns cycle through it
 public/images/                 Source JPEGs, plus generated .webp and thumbs/ (what the app actually loads)
+public/sites/<uuid>/           One folder per subdomain: data.json ({ title, lanterns: [...] }) + its own images/
 public/icon.svg                Favicon and PWA icon
 vite.config.js                 Vendor chunks (three, gsap) + PWA/Workbox config
 dist/                          Build output; git-ignored (Vercel builds on deploy)
@@ -68,11 +72,29 @@ dist/                          Build output; git-ignored (Vercel builds on deplo
 
 ### Changing lantern content
 
-Edit `public/data.json` (`text`) and put JPEGs in `public/images/`, then run `npm run optimize`. It writes the `.webp` photo and thumbnail and fills in the `image`/`thumb` paths. The lantern count is the second argument to `createLanterns` in `main.js`. If there are fewer entries than lanterns, entries repeat.
+Edit `public/data.json` (`text`) and put JPEGs in `public/images/`, then run `npm run optimize`. It writes the `.webp` photo and thumbnail, fills in the `image`/`thumb` paths, and adds an entry (caption = file name) for any new photo. The lantern count is the second argument to `createLanterns` in `main.js`. If there are fewer entries than lanterns, entries repeat.
+
+### Per-subdomain sites
+
+The same page serves different content per subdomain. `src/site.js` reads the first hostname label; if it is a UUID it loads `/sites/<uuid>/data.json`, otherwise (or if that file is missing) the default `/data.json`. `?site=<uuid>` does the same on hosts without wildcard subdomains (localhost, `*.vercel.app` previews); `<uuid>.localhost:5173` also works locally.
+
+1. `npm run new-site -- "Title"` creates `public/sites/<uuid>/`.
+2. Put JPEGs in its `images/`, run `npm run optimize`, then edit the captions in its `data.json`.
+3. Commit and push; the site is live at `https://<uuid>.<domain>`.
+
+Photo paths in a site's `data.json` are relative to that file. A path starting with `/` points at shared files (for example `/images/...` from the default set) and `optimize` leaves it alone. `title` sets the page title.
+
+### Admin dashboard
+
+`admin.html` + `src/admin/` is a second Vite entry, served at `/admin.html`. It signs in with Supabase Auth (email/password) and does CRUD on `sites` and `lanterns` plus photo upload/replace/delete in the storage bucket. Photos are resized to WebP in the browser (`src/admin/images.js`, same sizes as `npm run optimize`) and stored as `<uuid>/<random>.webp` + `<uuid>/thumbs/<random>.webp`. Needs `VITE_SUPABASE_*` in `.env.local`, and the write policies at the bottom of `supabase/schema.sql` (writes are limited to `authenticated`; disable public sign-ups). The service worker excludes it from precache and the navigation fallback.
+
+It is only reachable on its own subdomain, `admin.<domain>` (covered by the same `*.<domain>` wildcard as the sites; `admin` is not a UUID so it never collides with a site). `vercel.json` redirects `/` to `/admin.html` on that host and redirects `/admin.html` to `/` on every other host, and adds `noindex`/`no-store`/`X-Frame-Options`. `src/admin/main.js` also refuses to run off an `admin.*` host (localhost is allowed in dev). `*.vercel.app` hosts can't serve it. The admin JS chunk is still fetchable by URL on any host, but it holds no secrets (the publishable key is public) and every write needs a signed-in user.
 
 ## Deployment
 
 **Vercel**, through its GitHub integration. Every push to `main` triggers a Production deploy to https://three-lantern.vercel.app. Deploys show up as GitHub Deployments created by `vercel[bot]`. The repo has no `vercel.json` or GitHub Actions workflow; the Vercel project uses its settings for a Vite project (build `npm run build`, output `dist/`).
+
+Subdomain sites need a custom domain with a wildcard: add both `example.com` and `*.example.com` to the Vercel project. Wildcard domains require the domain to use Vercel's nameservers. `*.vercel.app` can't serve them, so use `?site=<uuid>` there.
 
 Release steps:
 
@@ -85,7 +107,7 @@ Only commit or push when the user asks you to.
 
 ### PWA and caching
 
-- `vite-plugin-pwa` generates `sw.js` with `registerType: 'autoUpdate'`. Workbox precaches `js, css, html, ico, png, svg` (not `models/` or `images/`); photos and any model files are cached CacheFirst at runtime (caches `images` and `models`, 60 entries, 30 days).
+- `vite-plugin-pwa` generates `sw.js` with `registerType: 'autoUpdate'`. Workbox precaches `js, css, html, ico, png, svg` (not `models/`, `images/` or `sites/`); photos and any model files are cached CacheFirst at runtime (caches `images` and `models`, 60 entries, 30 days).
 - After a deploy, returning visitors may see the old version until the service worker updates. If a change doesn't seem to show up, hard-reload or clear site data before assuming the deploy failed.
 - If you replace a photo, give it a new filename so clients don't keep serving the cached copy for 30 days.
 

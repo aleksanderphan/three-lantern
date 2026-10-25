@@ -18,6 +18,7 @@ export default defineConfig({
     // Vendor code changes rarely, so keep it in its own long-cached chunk
     chunkSizeWarningLimit: 800,
     rollupOptions: {
+      input: { main: "index.html", admin: "admin.html" },
       output: { manualChunks: { three: ["three"], gsap: ["gsap"] } },
     },
   },
@@ -38,7 +39,9 @@ export default defineConfig({
       workbox: {
         // Large binary assets are cached on first use instead of precached
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
-        globIgnores: ["models/**", "images/**"],
+        globIgnores: ["models/**", "images/**", "sites/**", "admin.html"],
+        // The admin page is network-only; don't let the SPA fallback serve the lantern scene for it
+        navigateFallbackDenylist: [/^\/admin/],
         runtimeCaching: [
           cacheFirst("models", /\.(glb|obj)$/i, 60),
           cacheFirst("images", /\.(jpe?g|webp|avif|png)$/i, 60),

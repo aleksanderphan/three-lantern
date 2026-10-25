@@ -1,0 +1,26 @@
+{
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "admin\\..+" }],
+      "destination": "/admin.html",
+      "permanent": false
+    },
+    {
+      "source": "/admin.html",
+      "missing": [{ "type": "host", "value": "admin\\..+" }],
+      "destination": "/",
+      "permanent": false
+    }
+  ],
+  "headers": [
+    {
+      "source": "/admin.html",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Cache-Control", "value": "no-store" },
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    }
+  ]
+}

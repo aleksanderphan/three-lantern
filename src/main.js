@@ -11,6 +11,7 @@ import { createBunnies } from "./objects/bunnies.js";
 import { createLandscape } from "./objects/landscape.js";
 import { createStars } from "./objects/stars.js";
 import { createSky, createHills } from "./objects/sky.js";
+import { loadSiteContent } from "./site.js";
 
 // ---------------------------------------------------------------------------
 // Quality tier: phones/tablets skip shadows + bloom and render at lower DPR.
@@ -177,7 +178,11 @@ window.addEventListener("resize", () => {
 // ---------------------------------------------------------------------------
 let lanternSystem = null;
 
-createLanterns(scene, 10, undefined, manager, { maxAnisotropy })
+loadSiteContent()
+  .then((site) => {
+    if (site.title) document.title = site.title;
+    return createLanterns(scene, 10, site.lanterns, manager, { maxAnisotropy });
+  })
   .then(async (system) => {
     lanternSystem = system;
     renderer.shadowMap.needsUpdate = true; // bake the tree shadow once
