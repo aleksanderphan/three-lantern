@@ -4,6 +4,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { makeVariants } from "./images.js";
 import { DEFAULT_ID, MAX_LANTERNS } from "../site.js";
+import { siteUrl, qrCanvas, qrPng, qrCardPng, download } from "./share.js";
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -101,6 +102,8 @@ function renderLogin() {
   app.replaceChildren(form);
 }
 
+const UUID_ANYWHERE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+
 // ---------- sites list ----------
 async function renderSites() {
   app.replaceChildren(h("p", { className: "muted" }, "Loading…"));
@@ -125,7 +128,7 @@ async function renderSites() {
     }),
   }, "Create default site");
 
-  const rows = sites.map((s) =>
+  const siteRow = (s) =>
     h(
       "div",
       { className: "site", style: s.id === DEFAULT_ID ? "border-color: var(--accent)" : "" },
@@ -137,15 +140,31 @@ async function renderSites() {
       h("span", { className: "muted" }, `${s.lanterns[0]?.count ?? 0} photos`),
       h("a", { className: "btn", href: `/?site=${s.id}`, target: "_blank", rel: "noopener" }, "View"),
       h("a", { className: "btn", href: `#/${s.id}` }, "Edit"),
-    ),
-  );
+    );
+
+  // Filters by title or uuid; a pasted site link works too (the uuid is pulled out of it).
+  const list = h("div", { className: "list" });
+  const search = h("input", { type: "search", placeholder: "Search by site title or uuid", className: "grow", autocomplete: "off" });
+  const drawList = () => {
+    const raw = search.value.trim().toLowerCase();
+    const q = raw.match(UUID_ANYWHERE)?.[0] ?? raw;
+    const shown = sites.filter((s) => !q || s.id.includes(q) || (s.title ?? "").toLowerCase().includes(q));
+    list.replaceChildren(...(shown.length ? shown.map(siteRow) : [h("p", { className: "muted" }, sites.length ? "No matching sites." : "No sites yet.")]));
+  };
+  let searchTimer;
+  search.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(drawList, 120);
+  });
+  drawList();
 
   app.replaceChildren(
     h("h2", {}, "Sites"),
     h("p", { className: "muted" }, "Each site is served at https://<uuid>.<your-domain> (or /?site=<uuid> on hosts without wildcard subdomains)."),
     h("div", { className: "row" }, title, h("button", { className: "primary", onclick: create }, "New site")),
     !hasDefault && h("div", { className: "row", style: "margin-top:12px" }, h("span", { className: "muted" }, "No default site yet."), createDefault),
-    h("div", { className: "list" }, rows.length ? rows : h("p", { className: "muted" }, "No sites yet.")),
+    h("div", { className: "row", style: "margin-top:12px" }, search),
+    list,
   );
 }
 
@@ -305,6 +324,23 @@ async function renderSite(id) {
   }
   drawGrid();
 
+  // Share: QR code for the site's public link, plus a stylized card, both as PNG downloads.
+  const url = siteUrl(id);
+  const qrBox = h("div", { className: "qr" });
+  qrCanvas(url, 320).then((c) => qrBox.replaceChildren(c)).catch(() => qrBox.replaceChildren("QR unavailable"));
+  const share = h("div", { className: "share" },
+    qrBox,
+    h("div", { className: "grow" },
+      h("div", { className: "muted" }, "Share this site"),
+      h("a", { className: "mono", href: url, target: "_blank", rel: "noopener" }, url),
+      h("div", { className: "row", style: "margin-top:10px" },
+        h("button", { onclick: () => navigator.clipboard.writeText(url).then(() => toast("Link copied")) }, "Copy link"),
+        h("button", { onclick: () => guard(async () => download(await qrPng(url), `qr-${id}.png`)) }, "Download QR"),
+        h("button", { onclick: () => guard(async () => download(await qrCardPng(url, titleInput.value.trim() || site.title), `qr-card-${id}.png`)) }, "Download card"),
+      ),
+    ),
+  );
+
   app.replaceChildren(
     h("p", {}, h("a", { href: "#/" }, "← All sites")),
     h("h2", {}, site.title || "(untitled)"),
@@ -314,6 +350,7 @@ async function renderSite(id) {
       h("a", { className: "btn", href: `/?site=${id}`, target: "_blank", rel: "noopener" }, "View site"),
     ),
     h("div", { className: "row", style: "margin-top:14px" }, titleInput, saveTitle, del),
+    share,
     counter,
     drop,
     fileInput,
