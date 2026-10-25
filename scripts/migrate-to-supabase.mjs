@@ -56,6 +56,10 @@ async function migrate(id) {
   const rows = [];
   let skipped = 0;
   for (const d of list) {
+    if (rows.length >= 10) { // keep in step with MAX_LANTERNS in src/site.js and the DB trigger
+      skipped++;
+      continue;
+    }
     // Placeholder entries pointing at files that don't exist would only show as broken lanterns
     if ([d.image, d.thumb].some((p) => isLocal(p) && !existsSync(path.join(dir, p)))) {
       skipped++;

@@ -59,6 +59,9 @@ async function fetchSupabase(id) {
   };
 }
 
+// Hard cap on photos (and so lanterns) per site; also enforced by the dashboard and a DB trigger.
+export const MAX_LANTERNS = 10;
+
 // The bare domain shows this reserved site (migrated from public/data.json, editable in the dashboard).
 export const DEFAULT_ID = "00000000-0000-0000-0000-000000000000";
 

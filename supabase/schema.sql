@@ -34,6 +34,17 @@ drop policy if exists "admin write photos" on storage.objects;
 create policy "admin write photos" on storage.objects for all to authenticated
   using (bucket_id = 'photos') with check (bucket_id = 'photos');
 
+-- Hard limit: at most 10 photos (lanterns) per site, whatever client writes them.
+create or replace function enforce_lantern_limit() returns trigger language plpgsql as $$
+begin
+  if (select count(*) from lanterns where site_id = new.site_id) >= 10 then
+    raise exception 'A site can have at most 10 photos';
+  end if;
+  return new;
+end $$;
+drop trigger if exists lantern_limit on lanterns;
+create trigger lantern_limit before insert on lanterns for each row execute function enforce_lantern_limit();
+
 -- Photos: create a public bucket named "photos" (Storage -> New bucket -> Public),
 -- then upload to <site uuid>/<file>.webp and <site uuid>/thumbs/<file>.webp.
 insert into storage.buckets (id, name, public) values ('photos', 'photos', true)

@@ -11,7 +11,7 @@ import { createBunnies } from "./objects/bunnies.js";
 import { createLandscape } from "./objects/landscape.js";
 import { createStars } from "./objects/stars.js";
 import { createSky, createHills } from "./objects/sky.js";
-import { loadSiteContent } from "./site.js";
+import { loadSiteContent, MAX_LANTERNS } from "./site.js";
 
 // ---------------------------------------------------------------------------
 // Quality tier: phones/tablets skip shadows + bloom and render at lower DPR.
@@ -181,7 +181,9 @@ let lanternSystem = null;
 loadSiteContent()
   .then((site) => {
     if (site.title) document.title = site.title;
-    return createLanterns(scene, 10, site.lanterns, manager, { maxAnisotropy });
+    // One lantern per photo, no repeats, capped
+    const list = site.lanterns.slice(0, MAX_LANTERNS);
+    return createLanterns(scene, list.length, list, manager, { maxAnisotropy });
   })
   .then(async (system) => {
     lanternSystem = system;

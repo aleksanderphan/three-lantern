@@ -3,7 +3,7 @@
 // supabase/schema.sql, so the secret key never reaches the browser.
 import { createClient } from "@supabase/supabase-js";
 import { makeVariants } from "./images.js";
-import { DEFAULT_ID } from "../site.js";
+import { DEFAULT_ID, MAX_LANTERNS } from "../site.js";
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -205,6 +205,11 @@ async function renderSite(id) {
   }
 
   async function addFiles(files) {
+    const room = MAX_LANTERNS - lanterns.length;
+    if (files.length > room) {
+      toast(room > 0 ? `Limit is ${MAX_LANTERNS} photos per site; adding the first ${room}` : `Limit of ${MAX_LANTERNS} photos reached`, true);
+      files = files.slice(0, Math.max(room, 0));
+    }
     if (!files.length) return;
     await guard(async () => {
       let next = Math.max(-1, ...lanterns.map((l) => l.sort)) + 1;
@@ -244,7 +249,9 @@ async function renderSite(id) {
   }
 
   const grid = h("div", { className: "grid" });
+  const counter = h("p", { className: "muted" });
   function drawGrid() {
+    counter.textContent = `${lanterns.length} / ${MAX_LANTERNS} photos`;
     grid.replaceChildren(
       ...lanterns.map((l, i) => {
         const caption = h("textarea", { value: l.text ?? "", placeholder: "Caption" });
@@ -303,6 +310,7 @@ async function renderSite(id) {
       h("a", { className: "btn", href: `/?site=${id}`, target: "_blank", rel: "noopener" }, "View site"),
     ),
     h("div", { className: "row", style: "margin-top:14px" }, titleInput, saveTitle, del),
+    counter,
     drop,
     fileInput,
     grid,
