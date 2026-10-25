@@ -14,7 +14,11 @@ const app = document.getElementById("app");
 // The dashboard lives on its own subdomain (admin.<domain>). Anywhere else (the public site,
 // <uuid>.<domain>, *.vercel.app) it refuses to start; vercel.json also redirects /admin.html away.
 // `npm run dev` on localhost is allowed so it can be built and tested.
-const onAdminHost = location.hostname.split(".")[0] === "admin" || (import.meta.env.DEV && /^(localhost|127\.0\.0\.1)$/.test(location.hostname));
+// Temporary: the `admin` git branch is deployed as a Vercel preview, so allow *.vercel.app too.
+const onAdminHost =
+  location.hostname.split(".")[0] === "admin" ||
+  location.hostname.endsWith(".vercel.app") ||
+  (import.meta.env.DEV && /^(localhost|127\.0\.0\.1)$/.test(location.hostname));
 if (!onAdminHost) {
   location.replace("/");
   throw new Error("Admin dashboard is only available on the admin subdomain");
