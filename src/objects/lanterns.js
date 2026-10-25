@@ -257,6 +257,8 @@ function createCardTexture(metadata, anisotropy, { scale = 1, url = metadata.thu
 
   if (url) {
     const img = new Image();
+    img.crossOrigin = "anonymous"; // Supabase photos are cross-origin; without this the canvas is tainted and WebGL refuses to upload it
+    img.onerror = () => console.warn("Lantern photo failed to load:", url);
     img.onload = () => {
       // object-fit: cover
       const s = Math.max(imgBox.w / img.width, imgBox.h / img.height);
