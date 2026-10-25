@@ -181,11 +181,16 @@ let lanternSystem = null;
 loadSiteContent()
   .then((site) => {
     if (site.title) document.title = site.title;
+    if (site.expired) {
+      document.querySelector(".hint").textContent = "This lantern site has expired";
+      return null;
+    }
     // One lantern per photo, no repeats, capped
     const list = site.lanterns.slice(0, MAX_LANTERNS);
     return createLanterns(scene, list.length, list, manager, { maxAnisotropy });
   })
   .then(async (system) => {
+    if (!system) return;
     lanternSystem = system;
     renderer.shadowMap.needsUpdate = true; // bake the tree shadow once
     await renderer.compileAsync(scene, camera); // avoid a first-frame shader hitch
