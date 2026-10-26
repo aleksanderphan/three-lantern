@@ -33,12 +33,35 @@ const toastEl = document.getElementById("toast");
 function h(tag, props = {}, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
-    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    if (k === "onclick" && tag === "button") {
+      // Disabled while the handler runs, so a double click can't fire the action twice.
+      el.addEventListener("click", async (e) => {
+        if (el.disabled) return;
+        el.disabled = true;
+        try {
+          await v(e);
+        } finally {
+          el.disabled = false;
+        }
+      });
+    } else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
     else if (k in el) el[k] = v;
     else el.setAttribute(k, v);
   }
   el.append(...kids.flat().filter((k) => k != null && k !== false));
   return el;
+}
+
+// app.replaceChildren(false) would render the text "false", so conditional children go through here.
+const show = (...kids) => app.replaceChildren(...kids.flat().filter((k) => k != null && k !== false));
+
+async function copy(text, msg) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(msg);
+  } catch {
+    toast("Couldn't copy; select the text and copy it manually", true);
+  }
 }
 
 let toastTimer;
@@ -91,6 +114,7 @@ function renderLogin() {
         e.preventDefault();
         guard(async () => {
           await ok(sb.auth.signInWithPassword({ email: email.value, password: pass.value }));
+          toast("Signed in");
         });
       },
     },
@@ -99,7 +123,7 @@ function renderLogin() {
     pass,
     h("button", { className: "primary", type: "submit" }, "Sign in"),
   );
-  app.replaceChildren(form);
+  show(form);
 }
 
 // "Expired" / "Expires in 3 days (2026-11-01)" / "" for a site's expires_at date.
@@ -114,13 +138,14 @@ const expiryBadge = (expiresAt) =>
 
 // ---------- sites list ----------
 async function renderSites() {
-  app.replaceChildren(h("p", { className: "muted" }, "Loading…"));
+  show(h("p", { className: "muted" }, "Loading…"));
   const sites = await ok(sb.from("sites").select("id,title,expires_at,lanterns(count)").order("title", { nullsFirst: false }));
 
   const title = h("input", { type: "text", placeholder: "New site title", className: "grow" });
   const create = async () =>
     guard(async () => {
       const [row] = await ok(sb.from("sites").insert({ title: title.value.trim() || null }).select("id"));
+      toast("Site created");
       location.hash = `#/${row.id}`;
     });
   title.addEventListener("keydown", (e) => e.key === "Enter" && create());
@@ -132,6 +157,7 @@ async function renderSites() {
     className: "primary",
     onclick: () => guard(async () => {
       await ok(sb.from("sites").insert({ id: DEFAULT_ID, title: "Default" }));
+      toast("Default site created");
       location.hash = `#/${DEFAULT_ID}`;
     }),
   }, "Create default site");
@@ -146,13 +172,13 @@ async function renderSites() {
         h("div", { className: "muted mono" }, s.id),
         expiryBadge(s.expires_at),
       ),
-      h("span", { className: "muted" }, `${s.lanterns[0]?.count ?? 0} photos`),
+      h("span", { className: "muted" }, `${s.lanterns[0]?.count ?? 0} photo${s.lanterns[0]?.count === 1 ? "" : "s"}`),
       h("a", { className: "btn", href: `/?site=${s.id}`, target: "_blank", rel: "noopener" }, "View"),
       h("a", { className: "btn", href: `#/${s.id}` }, "Edit"),
     ),
   );
 
-  app.replaceChildren(
+  show(
     h("h2", {}, "Sites"),
     h("p", { className: "muted" }, "Each site is served at https://<uuid>.<your-domain> (or /?site=<uuid> on hosts without wildcard subdomains)."),
     h("div", { className: "row" }, title, h("button", { className: "primary", onclick: create }, "New site")),
@@ -163,10 +189,10 @@ async function renderSites() {
 
 // ---------- one site ----------
 async function renderSite(id) {
-  app.replaceChildren(h("p", { className: "muted" }, "Loading…"));
+  show(h("p", { className: "muted" }, "Loading…"));
   const [site] = await ok(sb.from("sites").select("id,title,expires_at").eq("id", id));
   if (!site) {
-    app.replaceChildren(h("p", {}, "Site not found. "), h("a", { href: "#/" }, "Back"));
+    show(h("p", {}, "Site not found. "), h("a", { className: "btn", href: "#/" }, "Back"));
     return;
   }
   let lanterns = await ok(sb.from("lanterns").select("id,image,thumb,text,sort").eq("site_id", id).order("sort").order("id"));
@@ -275,6 +301,7 @@ async function renderSite(id) {
       await Promise.all(
         lanterns.map((l, n) => (l.sort === n ? null : sb.from("lanterns").update({ sort: n }).eq("id", l.id).then(({ error }) => { if (error) throw error; }))),
       );
+      toast("Order updated");
     });
     await reload();
   }
@@ -340,21 +367,22 @@ async function renderSite(id) {
     qrBox,
     h("div", { className: "grow" },
       h("div", { className: "muted" }, "Share this site"),
-      h("a", { className: "mono", href: url, target: "_blank", rel: "noopener" }, url),
+      h("div", { className: "mono url" }, url),
       h("div", { className: "row", style: "margin-top:10px" },
-        h("button", { onclick: () => navigator.clipboard.writeText(url).then(() => toast("Link copied")) }, "Copy link"),
-        h("button", { onclick: () => guard(async () => download(await qrPng(url), `qr-${id}.png`)) }, "Download QR"),
-        h("button", { onclick: () => guard(async () => download(await qrCardPng(url, titleInput.value.trim() || site.title), `qr-card-${id}.png`)) }, "Download card"),
+        h("a", { className: "btn", href: url, target: "_blank", rel: "noopener" }, "Open link"),
+        h("button", { onclick: () => copy(url, "Link copied") }, "Copy link"),
+        h("button", { onclick: () => guard(async () => { download(await qrPng(url), `qr-${id}.png`); toast("QR code downloaded"); }) }, "Download QR"),
+        h("button", { onclick: () => guard(async () => { download(await qrCardPng(url, titleInput.value.trim() || site.title), `qr-card-${id}.png`); toast("QR card downloaded"); }) }, "Download card"),
       ),
     ),
   );
 
-  app.replaceChildren(
-    h("p", {}, h("a", { href: "#/" }, "← All sites")),
+  show(
+    h("p", {}, h("a", { className: "btn", href: "#/" }, "← All sites")),
     h("h2", {}, site.title || "(untitled)"),
     h("div", { className: "row" },
       h("span", { className: "muted mono" }, id),
-      h("button", { onclick: () => navigator.clipboard.writeText(id).then(() => toast("UUID copied")) }, "Copy UUID"),
+      h("button", { onclick: () => copy(id, "UUID copied") }, "Copy UUID"),
       h("a", { className: "btn", href: `/?site=${id}`, target: "_blank", rel: "noopener" }, "View site"),
     ),
     h("div", { className: "row", style: "margin-top:14px" }, titleInput, saveTitle, del),
@@ -385,7 +413,10 @@ async function route() {
   await guard(() => (UUID.test(id) ? renderSite(id) : renderSites()));
 }
 
-logoutBtn.addEventListener("click", () => sb.auth.signOut());
+logoutBtn.addEventListener("click", () => guard(async () => {
+  await sb.auth.signOut();
+  toast("Signed out");
+}));
 window.addEventListener("hashchange", route);
 let routed = false;
 sb.auth.onAuthStateChange((_event, s) => {
