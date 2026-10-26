@@ -163,11 +163,13 @@ export function radialGlow() {
 export function createBunnies(scene, { groundY = -4, withLights = true, scale = 2.4, moonDirection = new THREE.Vector3(0, 0, -1) } = {}) {
   const group = new THREE.Group();
   group.position.y = groundY + 0.02;
+  group.rotation.y = Math.PI; // whole scene sits behind the tree, flipped 180 degrees from the camera's side
   group.scale.setScalar(scale); // layout below is authored at 1x; scaled to suit the big tree
   const glowMap = radialGlow();
 
   // Bunnies face +z at rot 0, so yaw toward the moon is atan2(x, z) of its horizontal direction
-  const moonYaw = Math.atan2(moonDirection.x, moonDirection.z);
+  // (minus the group's half turn)
+  const moonYaw = Math.atan2(moonDirection.x, moonDirection.z) - Math.PI;
 
   const bunnies = [
     { x: -0.7, z: 2.7, rot: moonYaw + 0.1, opts: { fur: 0xfff4ea, scale: 1.15 }, holdsDango: true },
