@@ -170,8 +170,8 @@ export function createBunnies(scene, { groundY = -4, withLights = true, scale = 
   const moonYaw = Math.atan2(moonDirection.x, moonDirection.z);
 
   const bunnies = [
-    { x: -1.7, z: 2.6, rot: moonYaw + 0.12, opts: { fur: 0xfff4ea, scale: 1.15 }, holdsDango: true },
-    { x: 2.1, z: 2.5, rot: moonYaw - 0.12, opts: { fur: 0xe9cfae, scale: 0.85 } },
+    { x: -0.7, z: 2.7, rot: moonYaw + 0.1, opts: { fur: 0xfff4ea, scale: 1.15 }, holdsDango: true },
+    { x: 0.85, z: 2.6, rot: moonYaw - 0.1, opts: { fur: 0xe9cfae, scale: 0.85 } },
   ].map((b, i) => {
     const bunny = createBunny(b.opts);
     bunny.group.position.set(b.x, 0, b.z);
@@ -189,9 +189,9 @@ export function createBunnies(scene, { groundY = -4, withLights = true, scale = 
 
   // Dango on a plate between the bunnies, plus skewers standing in the ground
   const plate = createDangoPlate();
-  plate.position.set(0.3, 0, 2.0);
+  plate.position.set(0.1, 0, 1.7); // in front of them, toward the moon
   group.add(plate);
-  for (const [x, z, r] of [[-0.8, 1.5, 0.12], [1.2, 1.5, -0.1], [-3.0, 2.0, 0.08]]) {
+  for (const [x, z, r] of [[-0.9, 1.5, 0.12], [1.1, 1.4, -0.1], [-3.0, 2.0, 0.08]]) {
     const s = createSkewer(3);
     s.position.set(x, 0, z);
     s.rotation.z = r;
@@ -200,8 +200,8 @@ export function createBunnies(scene, { groundY = -4, withLights = true, scale = 
 
   // Stone lanterns that light the bunnies; two carry a real light, the third is glow-only
   const lamps = [
-    { x: -3.6, z: 3.4, light: true },
-    { x: 3.7, z: 3.2, light: true },
+    { x: -2.6, z: 3.4, light: true },
+    { x: 2.7, z: 3.2, light: true },
     { x: 1.8, z: 0.9, light: false },
   ].map((p, i) => {
     const lamp = createStoneLantern(glowMap);
