@@ -47,12 +47,18 @@ function storageUrl(p) {
   return `${SB_URL}/storage/v1/object/public/${SB_BUCKET}/${p}`;
 }
 
+// expires_at is the last live day (UTC, YYYY-MM-DD, so plain string comparison works).
+export const isExpired = (expiresAt) => !!expiresAt && expiresAt < new Date().toISOString().slice(0, 10);
+
 async function fetchSupabase(id) {
   const [sites, rows] = await Promise.all([
-    sbSelect("sites", `id=eq.${id}&select=title`),
+    sbSelect("sites", `id=eq.${id}&select=title,expires_at`),
     sbSelect("lanterns", `site_id=eq.${id}&select=id,image,thumb,text&order=sort.asc,id.asc`),
   ]);
-  if (!sites.length || !rows.length) throw new Error(`supabase: no content for ${id}`);
+  if (!sites.length) throw new Error(`supabase: no content for ${id}`);
+  // Expired sites have no readable lanterns (RLS); report that instead of falling back to the default.
+  if (isExpired(sites[0].expires_at)) return { lanterns: [], expired: true };
+  if (!rows.length) throw new Error(`supabase: no content for ${id}`);
   return {
     title: sites[0].title,
     lanterns: rows.map((d) => ({ ...d, image: storageUrl(d.image), thumb: storageUrl(d.thumb) })),
@@ -65,7 +71,11 @@ export const MAX_LANTERNS = 10;
 // The bare domain shows this reserved site (migrated from public/data.json, editable in the dashboard).
 export const DEFAULT_ID = "00000000-0000-0000-0000-000000000000";
 
-export async function loadSiteContent() {
+// Memoized: the entry gate and the scene both ask for it, but it should be fetched once.
+let content;
+export const loadSiteContent = () => (content ??= fetchSiteContent());
+
+async function fetchSiteContent() {
   const id = siteId();
   if (SB_URL && SB_KEY) {
     try {
