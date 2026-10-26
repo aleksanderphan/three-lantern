@@ -136,8 +136,6 @@ function expiryLabel(expiresAt) {
 const expiryBadge = (expiresAt) =>
   expiresAt && h("span", { className: `badge${isExpired(expiresAt) ? " expired" : ""}` }, expiryLabel(expiresAt));
 
-const UUID_ANYWHERE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
-
 // ---------- sites list ----------
 async function renderSites() {
   show(h("p", { className: "muted" }, "Loading…"));
@@ -179,29 +177,12 @@ async function renderSites() {
       h("a", { className: "btn", href: `#/${s.id}` }, "Edit"),
     );
 
-  // Filters by title or uuid; a pasted site link works too (the uuid is pulled out of it).
-  const list = h("div", { className: "list" });
-  const search = h("input", { type: "search", placeholder: "Search by site title or uuid", className: "grow", autocomplete: "off" });
-  const drawList = () => {
-    const raw = search.value.trim().toLowerCase();
-    const q = raw.match(UUID_ANYWHERE)?.[0] ?? raw;
-    const shown = sites.filter((s) => !q || s.id.includes(q) || (s.title ?? "").toLowerCase().includes(q));
-    list.replaceChildren(...(shown.length ? shown.map(siteRow) : [h("p", { className: "muted" }, sites.length ? "No matching sites." : "No sites yet.")]));
-  };
-  let searchTimer;
-  search.addEventListener("input", () => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(drawList, 120);
-  });
-  drawList();
-
   show(
     h("h2", {}, "Sites"),
     h("p", { className: "muted" }, "Each site is served at https://<uuid>.<your-domain> (or /?site=<uuid> on hosts without wildcard subdomains)."),
     h("div", { className: "row" }, title, h("button", { className: "primary", onclick: create }, "New site")),
     !hasDefault && h("div", { className: "row", style: "margin-top:12px" }, h("span", { className: "muted" }, "No default site yet."), createDefault),
-    h("div", { className: "row", style: "margin-top:12px" }, search),
-    list,
+    h("div", { className: "list" }, sites.length ? sites.map(siteRow) : h("p", { className: "muted" }, "No sites yet.")),
   );
 }
 
