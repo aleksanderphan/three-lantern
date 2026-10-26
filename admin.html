@@ -62,18 +62,18 @@
       }
       .site a.name { color: var(--text); font-weight: 600; text-decoration: none; }
       .site a.name:hover { color: var(--accent); }
-      .share {
-        display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: 16px 0;
-        background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
-      }
-      .qr canvas { width: 160px; height: 160px; border-radius: 8px; display: block; }
-      .share .url { word-break: break-all; }
       .badge {
         display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
         font-size: 12px; border: 1px solid var(--accent); color: var(--accent);
       }
       .badge.expired { border-color: var(--danger); color: var(--danger); }
       input[type="date"] { width: auto; color-scheme: dark; }
+      .share {
+        display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: 16px 0;
+        background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
+      }
+      .qr canvas { width: 160px; height: 160px; border-radius: 8px; display: block; }
+      .share .url { word-break: break-all; }
       .drop {
         border: 2px dashed var(--line); border-radius: 12px; padding: 18px;
         text-align: center; color: var(--muted); margin: 16px 0;

@@ -23,3 +23,6 @@ Thumbs.db
 
 # Source archives of models that are already extracted alongside them
 public/models/*.zip
+
+.vercel
+.env*
