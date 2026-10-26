@@ -160,15 +160,18 @@ export function radialGlow() {
  * @param groundY world height of the island's top surface
  * @returns {{ group: THREE.Group, update: (time: number) => void }}
  */
-export function createBunnies(scene, { groundY = -4, withLights = true, scale = 2.4 } = {}) {
+export function createBunnies(scene, { groundY = -4, withLights = true, scale = 2.4, moonDirection = new THREE.Vector3(0, 0, -1) } = {}) {
   const group = new THREE.Group();
   group.position.y = groundY + 0.02;
   group.scale.setScalar(scale); // layout below is authored at 1x; scaled to suit the big tree
   const glowMap = radialGlow();
 
+  // Bunnies face +z at rot 0, so yaw toward the moon is atan2(x, z) of its horizontal direction
+  const moonYaw = Math.atan2(moonDirection.x, moonDirection.z);
+
   const bunnies = [
-    { x: -1.7, z: 2.6, rot: 0.35, opts: { fur: 0xfff4ea, scale: 1.15 }, holdsDango: true },
-    { x: 2.1, z: 2.5, rot: -0.55, opts: { fur: 0xe9cfae, scale: 0.85 } },
+    { x: -1.7, z: 2.6, rot: moonYaw + 0.12, opts: { fur: 0xfff4ea, scale: 1.15 }, holdsDango: true },
+    { x: 2.1, z: 2.5, rot: moonYaw - 0.12, opts: { fur: 0xe9cfae, scale: 0.85 } },
   ].map((b, i) => {
     const bunny = createBunny(b.opts);
     bunny.group.position.set(b.x, 0, b.z);

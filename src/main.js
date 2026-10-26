@@ -100,11 +100,12 @@ const CAMERA_MIN_Y = -3; // keep the camera above the terrain
 // ---------------------------------------------------------------------------
 // Sky + lights
 // ---------------------------------------------------------------------------
-createSky(scene, new THREE.Vector3(-0.4, 0.26, -0.85));
+const moonDirection = new THREE.Vector3(-0.4, 0.26, -0.85);
+createSky(scene, moonDirection);
 createHills(scene);
 const stars = createStars(scene, isLowTier ? 1000 : 1800);
 const { petals, groundY } = createTree(scene, { petalCount: isLowTier ? 150 : 350 });
-const bunnies = createBunnies(scene, { groundY, withLights: !isLowTier });
+const bunnies = createBunnies(scene, { groundY, withLights: !isLowTier, moonDirection });
 const landscape = createLandscape(scene, { groundY, quality: isLowTier ? 0.45 : 1 });
 
 // Moonlit night: cool sky bounce from above, dark green-brown bounce from the ground,
