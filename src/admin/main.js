@@ -184,7 +184,7 @@ async function renderSite(id) {
   app.replaceChildren(h("p", { className: "muted" }, "Loading…"));
   const [site] = await ok(sb.from("sites").select("id,title,expires_at").eq("id", id));
   if (!site) {
-    app.replaceChildren(h("p", {}, "Site not found. "), h("a", { href: "#/" }, "Back"));
+    app.replaceChildren(h("p", {}, "Site not found. "), h("a", { className: "btn", href: "#/" }, "Back"));
     return;
   }
   let lanterns = await ok(sb.from("lanterns").select("id,image,thumb,text,sort").eq("site_id", id).order("sort").order("id"));
@@ -358,8 +358,9 @@ async function renderSite(id) {
     qrBox,
     h("div", { className: "grow" },
       h("div", { className: "muted" }, "Share this site"),
-      h("a", { className: "mono", href: url, target: "_blank", rel: "noopener" }, url),
+      h("div", { className: "mono url" }, url),
       h("div", { className: "row", style: "margin-top:10px" },
+        h("a", { className: "btn", href: url, target: "_blank", rel: "noopener" }, "Open link"),
         h("button", { onclick: () => navigator.clipboard.writeText(url).then(() => toast("Link copied")) }, "Copy link"),
         h("button", { onclick: () => guard(async () => download(await qrPng(url), `qr-${id}.png`)) }, "Download QR"),
         h("button", { onclick: () => guard(async () => download(await qrCardPng(url, titleInput.value.trim() || site.title), `qr-card-${id}.png`)) }, "Download card"),
@@ -368,7 +369,7 @@ async function renderSite(id) {
   );
 
   app.replaceChildren(
-    h("p", {}, h("a", { href: "#/" }, "← All sites")),
+    h("p", {}, h("a", { className: "btn", href: "#/" }, "← All sites")),
     h("h2", {}, site.title || "(untitled)"),
     h("div", { className: "row" },
       h("span", { className: "muted mono" }, id),
