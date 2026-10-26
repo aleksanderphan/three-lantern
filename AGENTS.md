@@ -92,7 +92,11 @@ It is only reachable on its own subdomain, `admin.<domain>` (covered by the same
 
 ## Deployment
 
-**Vercel**, through its GitHub integration. Every push to `main` triggers a Production deploy to https://three-lantern.vercel.app. Deploys show up as GitHub Deployments created by `vercel[bot]`. The repo has no `vercel.json` or GitHub Actions workflow; the Vercel project uses its settings for a Vite project (build `npm run build`, output `dist/`).
+**Vercel**, through its GitHub integration. Every push to `main` triggers a Production deploy to https://three-lantern.vercel.app. Deploys show up as GitHub Deployments created by `vercel[bot]`. The repo has no GitHub Actions workflow; `vercel.json` only holds the admin host rules, and the Vercel project otherwise uses its settings for a Vite project (build `npm run build`, output `dist/`).
+
+**Environment variables** are not read from `.env.local` (git-ignored) on Vercel. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in Vercel → Settings → Environment Variables for **Production and Preview**, then redeploy; without them the site silently falls back to the static files and the dashboard shows an error. Never put `SUPABASE_SECRET_KEY` there; it is only for the local `npm run migrate`.
+
+**Temporary `admin` branch.** Until `admin.<domain>` exists, the dashboard is served from the `admin` git branch, which Vercel builds as a Preview (alias `three-lantern-git-admin-<team>.vercel.app`, behind Vercel's deployment protection). That branch differs from `main` in exactly two files: `vercel.json` redirects `/` to `/admin.html` on every host, and the host check in `src/admin/main.js` also accepts `*.vercel.app`. **Never merge `admin` into `main`** (it would expose the dashboard on the public site); bring dashboard changes over by merging `main` into `admin`. When the custom domain is ready, delete the branch (`git push origin --delete admin`).
 
 Subdomain sites need a custom domain with a wildcard: add both `example.com` and `*.example.com` to the Vercel project. Wildcard domains require the domain to use Vercel's nameservers. `*.vercel.app` can't serve them, so use `?site=<uuid>` there.
 
