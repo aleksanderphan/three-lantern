@@ -1,8 +1,14 @@
 -- Run in the Supabase SQL editor. One row in `sites` per subdomain uuid.
 create table if not exists sites (
   id uuid primary key default gen_random_uuid(),
-  title text
+  title text,
+  expires_at date        -- last day the site is live (UTC); null = never expires
 );
+-- Existing projects: add the column and keep the default site (all-zero uuid) from ever expiring.
+alter table sites add column if not exists expires_at date;
+alter table sites drop constraint if exists default_site_never_expires;
+alter table sites add constraint default_site_never_expires
+  check (id <> '00000000-0000-0000-0000-000000000000' or expires_at is null);
 
 create table if not exists lanterns (
   id bigint generated always as identity primary key,
@@ -20,8 +26,13 @@ alter table lanterns enable row level security;
 -- Postgres has no "create policy if not exists", so drop first to keep this file re-runnable.
 drop policy if exists "public read sites" on sites;
 create policy "public read sites" on sites for select using (true);
+-- Public lanterns of an expired site are hidden at the database, so expiry can't be bypassed in the
+-- browser. The site row stays readable (title + date) so the page can say it has expired; signed-in
+-- admins read everything through the write policies below.
 drop policy if exists "public read lanterns" on lanterns;
-create policy "public read lanterns" on lanterns for select using (true);
+create policy "public read lanterns" on lanterns for select using (
+  exists (select 1 from sites s where s.id = lanterns.site_id and (s.expires_at is null or s.expires_at >= current_date))
+);
 
 -- Admin dashboard (/admin.html): any signed-in user can write. Create your admin user under
 -- Authentication -> Users and disable public sign-ups (Authentication -> Sign In / Providers),

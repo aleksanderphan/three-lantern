@@ -3,7 +3,8 @@
 // supabase/schema.sql, so the secret key never reaches the browser.
 import { createClient } from "@supabase/supabase-js";
 import { makeVariants } from "./images.js";
-import { DEFAULT_ID, MAX_LANTERNS } from "../site.js";
+import { DEFAULT_ID, MAX_LANTERNS, isExpired } from "../site.js";
+import { siteUrl, qrCanvas, qrPng, qrCardPng, download } from "./share.js";
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -101,10 +102,20 @@ function renderLogin() {
   app.replaceChildren(form);
 }
 
+// "Expired" / "Expires in 3 days (2026-11-01)" / "" for a site's expires_at date.
+function expiryLabel(expiresAt) {
+  if (!expiresAt) return "";
+  if (isExpired(expiresAt)) return `Expired ${expiresAt}`;
+  const days = Math.round((Date.parse(expiresAt) - Date.parse(new Date().toISOString().slice(0, 10))) / 864e5);
+  return days === 0 ? `Expires today (${expiresAt})` : `Expires in ${days} day${days > 1 ? "s" : ""} (${expiresAt})`;
+}
+const expiryBadge = (expiresAt) =>
+  expiresAt && h("span", { className: `badge${isExpired(expiresAt) ? " expired" : ""}` }, expiryLabel(expiresAt));
+
 // ---------- sites list ----------
 async function renderSites() {
   app.replaceChildren(h("p", { className: "muted" }, "Loading…"));
-  const sites = await ok(sb.from("sites").select("id,title,lanterns(count)").order("title", { nullsFirst: false }));
+  const sites = await ok(sb.from("sites").select("id,title,expires_at,lanterns(count)").order("title", { nullsFirst: false }));
 
   const title = h("input", { type: "text", placeholder: "New site title", className: "grow" });
   const create = async () =>
@@ -133,6 +144,7 @@ async function renderSites() {
         h("a", { className: "name", href: `#/${s.id}` }, s.title || "(untitled)"),
         s.id === DEFAULT_ID && h("span", { className: "muted" }, " · Default / fallback: shown on the bare domain and for unknown sites"),
         h("div", { className: "muted mono" }, s.id),
+        expiryBadge(s.expires_at),
       ),
       h("span", { className: "muted" }, `${s.lanterns[0]?.count ?? 0} photos`),
       h("a", { className: "btn", href: `/?site=${s.id}`, target: "_blank", rel: "noopener" }, "View"),
@@ -152,7 +164,7 @@ async function renderSites() {
 // ---------- one site ----------
 async function renderSite(id) {
   app.replaceChildren(h("p", { className: "muted" }, "Loading…"));
-  const [site] = await ok(sb.from("sites").select("id,title").eq("id", id));
+  const [site] = await ok(sb.from("sites").select("id,title,expires_at").eq("id", id));
   if (!site) {
     app.replaceChildren(h("p", {}, "Site not found. "), h("a", { href: "#/" }, "Back"));
     return;
@@ -172,6 +184,21 @@ async function renderSite(id) {
       toast("Title saved");
     }),
   }, "Save title");
+
+  // Expiry: the site shows no lanterns after this date (enforced by RLS); empty = never.
+  const expiryInput = h("input", { type: "date", value: site.expires_at ?? "" });
+  const expiryNote = h("span", {}, expiryBadge(site.expires_at));
+  const saveExpiry = h("button", {
+    onclick: () => guard(async () => {
+      const expires_at = expiryInput.value || null;
+      await ok(sb.from("sites").update({ expires_at }).eq("id", id));
+      expiryNote.replaceChildren(expiryBadge(expires_at) || "");
+      toast(expires_at ? "Expiration saved" : "Expiration cleared");
+    }),
+  }, "Save expiration");
+  const expiry = h("div", { className: "row", style: "margin-top:14px", hidden: id === DEFAULT_ID },
+    h("label", { className: "muted" }, "Expires after "), expiryInput, saveExpiry,
+    h("button", { onclick: () => { expiryInput.value = ""; saveExpiry.click(); } }, "Never"), expiryNote);
 
   const del = h("button", {
     className: "danger",
@@ -305,6 +332,23 @@ async function renderSite(id) {
   }
   drawGrid();
 
+  // Share: QR code for the site's public link, plus a stylized card, both as PNG downloads.
+  const url = siteUrl(id);
+  const qrBox = h("div", { className: "qr" });
+  qrCanvas(url, 320).then((c) => qrBox.replaceChildren(c)).catch(() => qrBox.replaceChildren("QR unavailable"));
+  const share = h("div", { className: "share" },
+    qrBox,
+    h("div", { className: "grow" },
+      h("div", { className: "muted" }, "Share this site"),
+      h("a", { className: "mono", href: url, target: "_blank", rel: "noopener" }, url),
+      h("div", { className: "row", style: "margin-top:10px" },
+        h("button", { onclick: () => navigator.clipboard.writeText(url).then(() => toast("Link copied")) }, "Copy link"),
+        h("button", { onclick: () => guard(async () => download(await qrPng(url), `qr-${id}.png`)) }, "Download QR"),
+        h("button", { onclick: () => guard(async () => download(await qrCardPng(url, titleInput.value.trim() || site.title), `qr-card-${id}.png`)) }, "Download card"),
+      ),
+    ),
+  );
+
   app.replaceChildren(
     h("p", {}, h("a", { href: "#/" }, "← All sites")),
     h("h2", {}, site.title || "(untitled)"),
@@ -314,6 +358,8 @@ async function renderSite(id) {
       h("a", { className: "btn", href: `/?site=${id}`, target: "_blank", rel: "noopener" }, "View site"),
     ),
     h("div", { className: "row", style: "margin-top:14px" }, titleInput, saveTitle, del),
+    expiry,
+    share,
     counter,
     drop,
     fileInput,
