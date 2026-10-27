@@ -21,6 +21,8 @@ create table if not exists lanterns (
 create index if not exists lanterns_site_idx on lanterns (site_id, sort);
 
 -- The publishable key ships to the browser: public read only, writes via dashboard/service role.
+-- The live database (shared with moonletter) has since replaced these public read policies with the read_site()
+-- function: see moonletter's supabase/migrations/0006_read_site_rpc.sql and 0007_close_public_reads.sql.
 alter table sites enable row level security;
 alter table lanterns enable row level security;
 -- Postgres has no "create policy if not exists", so drop first to keep this file re-runnable.

@@ -28,16 +28,19 @@ async function fetchContent(path) {
 }
 
 // Supabase is optional: without these env vars the static files below are used.
-// Plain fetch against the REST API (publishable key + RLS read policy) keeps supabase-js out of the bundle.
+// Plain fetch against the REST API keeps supabase-js out of the bundle. The tables aren't publicly readable;
+// the read_site() function returns one site by its uuid, so only someone with the link sees its photos.
 const SB_URL = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
 const SB_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const SB_BUCKET = import.meta.env.VITE_SUPABASE_BUCKET || "photos";
 
-async function sbSelect(table, query) {
-  const res = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
-    headers: { apikey: SB_KEY }, // publishable keys aren't JWTs, so no Bearer header
+async function sbReadSite(id) {
+  const res = await fetch(`${SB_URL}/rest/v1/rpc/read_site`, {
+    method: "POST",
+    headers: { apikey: SB_KEY, "Content-Type": "application/json" }, // publishable keys aren't JWTs, so no Bearer header
+    body: JSON.stringify({ p_key: id }),
   });
-  if (!res.ok) throw new Error(`supabase ${table}: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`supabase read_site: HTTP ${res.status}`);
   return res.json();
 }
 
@@ -51,17 +54,14 @@ function storageUrl(p) {
 export const isExpired = (expiresAt) => !!expiresAt && expiresAt < new Date().toISOString().slice(0, 10);
 
 async function fetchSupabase(id) {
-  const [sites, rows] = await Promise.all([
-    sbSelect("sites", `id=eq.${id}&select=title,expires_at`),
-    sbSelect("lanterns", `site_id=eq.${id}&select=id,image,thumb,text&order=sort.asc,id.asc`),
-  ]);
-  if (!sites.length) throw new Error(`supabase: no content for ${id}`);
-  // Expired sites have no readable lanterns (RLS); report that instead of falling back to the default.
-  if (isExpired(sites[0].expires_at)) return { lanterns: [], expired: true };
-  if (!rows.length) throw new Error(`supabase: no content for ${id}`);
+  const data = await sbReadSite(id);
+  if (!data) throw new Error(`supabase: no content for ${id}`);
+  // Expired sites return no lanterns; report that instead of falling back to the default.
+  if (data.expired) return { lanterns: [], expired: true };
+  if (!data.lanterns.length) throw new Error(`supabase: no content for ${id}`);
   return {
-    title: sites[0].title,
-    lanterns: rows.map((d) => ({ ...d, image: storageUrl(d.image), thumb: storageUrl(d.thumb) })),
+    title: data.site.title,
+    lanterns: data.lanterns.map(({ id, image, thumb, text }) => ({ id, image: storageUrl(image), thumb: storageUrl(thumb), text })),
   };
 }
 
