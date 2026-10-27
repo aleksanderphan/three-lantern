@@ -15,6 +15,8 @@ const cacheFirst = (cacheName, test, maxEntries) => ({
 
 export default defineConfig({
   build: {
+    // Never ship source maps: they would hand out the original scene source (Vite's default, kept explicit)
+    sourcemap: false,
     // Vendor code changes rarely, so keep it in its own long-cached chunk
     chunkSizeWarningLimit: 800,
     rollupOptions: {
